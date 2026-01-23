@@ -1,0 +1,44 @@
+{
+    "recognition": {
+        "engine": "vosk",
+        "vosk_model": "vosk-model-small-ru-0.22",
+        "activation_phrase": "джарвис",
+        "listen_timeout": 10.0,
+        "phrase_time_limit": 4.0
+    },
+    "voice": {
+        "tts_enabled": true,
+        "tts_rate": 180,
+        "tts_volume": 1.0,
+        "prefer_cached_sounds": false
+    },
+    "interface": {
+        "color_scheme": "default",
+        "always_on_top": false,
+        "auto_start_voice": true,
+        "show_timestamp": false,
+        "log_max_lines": 500,
+        "reactor_scale": 0.8
+    },
+    "reaction": {
+        "reactor_speed": 0.5,
+        "auto_reactor": false,
+        "reactor_duration": 10.0
+    },
+    "llm": {
+        "enabled": false,
+        "model": "deepseek-r1:8b",
+        "ollama_path": "C:\\Users\\123\\AppData\\Local\\Programs\\Ollama\\ollama.exe",
+        "system_prompt": "Ты - Джарвис, голосовой помощник. Отвечай кратко и по делу. Будь вежливым и полезным. Отвечай на русском языке."
+    },
+    "hotkeys": {
+        "global_hotkey": "ctrl+alt+j",
+        "activate_hotkey": "ctrl+shift+j",
+        "show_desktop_hotkey": "ctrl+alt+d"
+    },
+    "paths": {
+        "sounds_dir": "jarvis_sounds",
+        "vosk_models_dir": "voice_models",
+        "screenshots_dir": "screenshots"
+    }
+}

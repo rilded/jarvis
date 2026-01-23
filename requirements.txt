@@ -1,0 +1,25 @@
+pyautogui==0.9.54
+pyttsx3==2.90
+vosk==0.3.45
+pyaudio==0.2.11
+SpeechRecognition==3.10.0
+keyboard==0.13.5
+pyperclip==1.8.2
+psutil==5.9.5
+requests==2.31.0
+pillow==10.1.0
+winsound; sys_platform == 'win32'
+tkinter; sys_platform == 'win32'
+edge-tts==6.1.9
+playsound==1.2.2
+pyautogui>=0.9.54
+winsound==1.0.4
+pyperclip>=1.8.2
+keyboard>=0.13.5
+psutil>=5.9.0
+loky>=3.4.0
+pygame>=2.5.0
+pyttsx3>=2.90
+SpeechRecognition>=3.10.0
+PyAudio>=0.2.11
+requests>=2.31.0

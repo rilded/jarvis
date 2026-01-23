@@ -1,0 +1,9 @@
+{
+  "вэйл си": {
+    "type": "run_program",
+    "params": {
+      "path": "\"C:\\Program Files (x86)\\VideoLAN\\VLC\\vlc.exe\""
+    },
+    "created": "2026-01-23 21:07:18"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "activation_phrase": "джарвис",
+  "timeout_before_command": 25,
+  "timeout_after_command": 15,
+  "vosk_model": "vosk-model-ru-0.42",
+  "assistant_name": "бот",
+  "voice_model": "default",
+  "custom_voices": {},
+  "urgent_commands_enabled": true,
+  "always_listen_mode": false,
+  "user_commands": [
+    {
+      "trigger": "музыка",
+      "action": "открытие файлов",
+      "parameter": "C:\\Users\\123\\AppData\\Local\\Programs\\YandexMusic\\Яндекс Музыка.exe"
+    },
+    {
+      "trigger": "новости",
+      "action": "открытие ссылки",
+      "parameter": "https://news.yandex.ru"
+    }
+  ]
+}

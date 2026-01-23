@@ -1,0 +1,23 @@
+{
+  "sounds": {
+    "thanks": "thanks.wav",
+    "stupid": "stupid.wav", 
+    "run": "run.wav",
+    "ready": "ready.wav",
+    "ok4": "ok4.wav",
+    "ok3": "ok3.wav",
+    "ok2": "ok2.wav",
+    "ok1": "ok1.wav",
+    "not_found": "not_found.wav",
+    "greet3": "greet3.wav",
+    "greet2": "greet2.wav"
+  },
+  "responses": {
+    "startup": ["run", "ready"],
+    "acknowledgment": ["ok1", "ok2", "ok3", "ok4"],
+    "error": ["not_found"],
+    "completion": ["thanks"],
+    "listening": ["greet2", "greet3"],
+    "sarcastic": ["stupid"]
+  }
+}

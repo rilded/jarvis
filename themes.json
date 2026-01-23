@@ -1,0 +1,29 @@
+{
+  "dark": {
+    "accent_color": "#00ffff",
+    "background_color": "#000000",
+    "text_color": "#e0e0e0",
+    "button_color": "#222222",
+    "success_color": "#00ff00",
+    "warning_color": "#ffaa00",
+    "error_color": "#ff5555"
+  },
+  "light": {
+    "accent_color": "#0066cc",
+    "background_color": "#f0f0f0",
+    "text_color": "#333333",
+    "button_color": "#dddddd",
+    "success_color": "#008800",
+    "warning_color": "#cc6600",
+    "error_color": "#cc0000"
+  },
+  "blue": {
+    "accent_color": "#0088ff",
+    "background_color": "#000022",
+    "text_color": "#e0e0ff",
+    "button_color": "#002244",
+    "success_color": "#00ff88",
+    "warning_color": "#ffaa00",
+    "error_color": "#ff5555"
+  }
+}

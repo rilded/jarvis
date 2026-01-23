@@ -1,0 +1,12 @@
+{
+    "яндекс": {
+        "type": "open_url",
+        "params": {"url": "https://yandex.ru"},
+        "created": "2024-01-01 12:00:00"
+    },
+    "рабочий стол": {
+        "type": "press_keys",
+        "params": {"keys": ["win", "d"]},
+        "created": "2024-01-01 12:00:00"
+    }
+}

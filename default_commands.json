@@ -1,0 +1,23 @@
+{
+  "открой почту": {
+    "type": "open_url",
+    "params": {
+      "url": "https://mail.google.com"
+    },
+    "created": "2024-01-01 00:00:00"
+  },
+  "рабочее пространство": {
+    "type": "run_program",
+    "params": {
+      "path": "notepad.exe"
+    },
+    "created": "2024-01-01 00:00:00"
+  },
+  "скриншот": {
+    "type": "press_keys",
+    "params": {
+      "keys": ["win", "shift", "s"]
+    },
+    "created": "2024-01-01 00:00:00"
+  }
+}
