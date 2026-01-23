@@ -3,7 +3,7 @@
 
 установите все необходимые библиотеки они в файле библиотеки.txt
 
-в папке установите голос RHVoice-voice-Russian-Vitaliy-v4.0.2009.14-setup.exe
+установите голос RHVoice-voice-Russian-Vitaliy-v4.0.2009.14-setup.exe
 
 для использования режима общения скачайте олламу https://ollama.com/download/OllamaSetup.exe
 
