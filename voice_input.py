@@ -33,6 +33,7 @@ class VoiceInput:
         self.llm_history = []  # История разговора с LLM
         self.custom_commands = CustomCommandsManager()
         self.sound_manager = JarvisSoundManager()
+        self.llm_tts_only = True
         
         # Настройки распознавания
         self.recognition_engine = "vosk"  # По умолчанию VOSK
@@ -324,67 +325,58 @@ class VoiceInput:
         input("\nНажмите Enter для продолжения...")
     
     def _init_tts(self):
-        """Инициализировать движок TTS для создания новых звуков"""
+        """Улучшенная инициализация TTS с приоритетом голоса Vitaliy"""
         try:
             import pyttsx3
+            
+            # Останавливаем старый движок если есть
+            if hasattr(self, 'tts_engine') and self.tts_engine is not None:
+                try:
+                    self.tts_engine.stop()
+                except:
+                    pass
+            
             self.tts_engine = pyttsx3.init()
             
-            # Устанавливаем параметры голоса
-            self.tts_engine.setProperty('rate', 180)  # Немного медленнее для четкости
-            self.tts_engine.setProperty('volume', 0.9)
-            
-            print("Поиск голоса Vitaliy...")
             voices = self.tts_engine.getProperty('voices')
             
-            # Выводим все доступные голоса для отладки
-            print("Доступные голоса:")
-            for i, voice in enumerate(voices):
-                print(f"  {i}: {voice.name} | ID: {voice.id}")
+            # Приоритетный поиск голосов
+            voice_priority = [
+                # 1. Голос Vitaliy
+                lambda v: 'Vitaliy' in v.name,
+                # 2. Русские голоса
+                lambda v: any(keyword in v.name.lower() or keyword in v.id.lower() 
+                            for keyword in ['russian', 'ru', 'russ', 'rur']),
+                # 3. Любой доступный голос
+                lambda v: True
+            ]
             
-            # Ищем именно голос Vitaliy (как в Балаболке)
-            vitaliy_voice = None
-            for voice in voices:
-                voice_name = voice.name
-                # Ищем точное совпадение или частичное
-                if 'Vitaliy' in voice_name and 'RHVoice' in str(voice.id):
-                    vitaliy_voice = voice
-                    print(f"Найден голос Vitaliy (RHVoice): {voice.name}")
-                    break
-                elif voice_name == 'Vitaliy' or voice_name.startswith('Vitaliy'):
-                    vitaliy_voice = voice
-                    print(f"Найден голос Vitaliy: {voice.name}")
-                    break
-            
-            if vitaliy_voice:
-                self.tts_engine.setProperty('voice', vitaliy_voice.id)
-                print(f"Выбран голос Vitaliy для озвучки: {vitaliy_voice.name}")
-            else:
-                # Если не нашли Vitaliy, ищем любой русский мужской голос
-                print("Голос Vitaliy не найден, ищу альтернативы...")
-                male_voice_found = False
+            selected_voice = None
+            for priority_func in voice_priority:
                 for voice in voices:
-                    voice_name = voice.name.lower()
-                    voice_id = str(voice.id).lower()
-                    
-                    # Критерии мужского русского голоса
-                    if ('мужск' in voice_name or 'male' in voice_name or 
-                        'vital' in voice_name or 'витал' in voice_name or
-                        ('russian' in voice_id and 'male' in voice_id)):
-                        self.tts_engine.setProperty('voice', voice.id)
-                        print(f"Выбран мужской голос: {voice.name}")
-                        male_voice_found = True
+                    if priority_func(voice):
+                        selected_voice = voice
+                        print(f"Найден голос по приоритету {voice_priority.index(priority_func) + 1}: {voice.name}")
                         break
-                
-                # Если ничего не найдено, берем первый доступный
-                if not male_voice_found and voices:
-                    self.tts_engine.setProperty('voice', voices[0].id)
-                    print(f"Выбран первый доступный голос: {voices[0].name}")
+                if selected_voice:
+                    break
             
-            print("TTS для создания новых звуков инициализирован")
+            if selected_voice:
+                self.tts_engine.setProperty('voice', selected_voice.id)
+                print(f"Установлен голос: {selected_voice.name}")
+            else:
+                print("Нет доступных голосов")
+                self.tts_engine = None
+                return
+            
+            # Настройки для русского языка
+            self.tts_engine.setProperty('rate', 160)
+            self.tts_engine.setProperty('volume', 0.9)
+            
+            print("Основной TTS движок инициализирован")
             
         except ImportError:
             print("pyttsx3 не установлен. Установите: pip install pyttsx3")
-            print("Будут использоваться только кэшированные звуки")
             self.tts_engine = None
         except Exception as e:
             print(f"Ошибка инициализации TTS: {e}")
@@ -415,6 +407,11 @@ class VoiceInput:
         if not text or (self.is_speaking and not force):
             return
         
+        # Если мы в режиме LLM, используем специальную озвучку
+        if self.is_llm_mode:
+            self.speak_llm_response(text)
+            return
+
         self.is_speaking = True
         
         try:
@@ -543,75 +540,91 @@ class VoiceInput:
         self.sound_manager.play_startup_sound()
     
     def speak(self, text, force=False):
-        """Произнести текст через звуковые файлы"""
-        if not text or (self.is_speaking and not force):
+        """Произнести текст - РАЗДЕЛЕННАЯ ЛОГИКА ДЛЯ РЕЖИМА LLM"""
+        if not text:
             return
         
-        # Маппинг текста на звуки
-        sound_mapping = {
-            # Приветствия
-            "слушаю": "listening",
-            "готов": "listening", 
-            "в вашим услугам": "listening",
-            
-            # Подтверждения
-            "открываю": "acknowledgment",
-            "показываю": "acknowledgment",
-            "проверяю": "acknowledgment",
-            "делаю": "acknowledgment",
-            "включаю": "acknowledgment",
-            "загружаю": "acknowledgment",
-            "есть": "acknowledgment",
-            "как пожелаете": "acknowledgment",
-            "запрос выполнен": "acknowledgment",
-            
-            # Завершение
-            "завершаю работу": "completion",
-            "готово": "completion",
-            "принято": "completion",
-            "всегда к вашим услугам": "completion",
-            
-            # Ошибки
-            "ошибка": "error",
-            "неизвестно": "error",
-            "не понял": "error",
-            "чего вы пытаетесь добиться": "error",
-            
-            # Сарказм
-            "очень тонкое замечание": "sarcastic",
-            
-            # Конкретные фразы для точного совпадения
-            "добрый день сэр": "run",
-            "мы подключены и готовы": "ready"
-        }
+        # Если мы в режиме LLM и флаг установлен - используем только TTS
+        if self.is_llm_mode and self.llm_tts_only:
+            self.speak_llm_response(text)
+            return
         
-        # Приводим текст к нижнему регистру для сравнения
-        text_lower = text.lower()
+        # Оригинальная логика для обычного режима
+        if self.is_speaking and not force:
+            return
         
-        # Ищем совпадение
-        sound_to_play = None
-        for phrase, sound_category in sound_mapping.items():
-            if phrase in text_lower:
-                sound_to_play = sound_category
-                break
+        self.is_speaking = True
         
-        # Если нашли соответствие - воспроизводим звук
-        if sound_to_play:
-            if sound_to_play in ["acknowledgment", "listening"]:
-                self.sound_manager.play_random_sound(sound_to_play)
-            elif sound_to_play == "run":
-                self.sound_manager.play_sound("run")
-            elif sound_to_play == "ready":
-                self.sound_manager.play_sound("ready")
-            elif sound_to_play == "completion":
-                self.sound_manager.play_completion_sound()
-            elif sound_to_play == "error":
-                self.sound_manager.play_error_sound()
-            elif sound_to_play == "sarcastic":
-                self.sound_manager.play_sarcastic_sound()
-        else:
-            # Если не нашли соответствия, используем случайное подтверждение
-            self.sound_manager.play_acknowledgment()
+        try:
+            # Маппинг текста на звуки (только для обычного режима)
+            sound_mapping = {
+                # Приветствия
+                "слушаю": "listening",
+                "готов": "listening", 
+                "в вашим услугам": "listening",
+                
+                # Подтверждения
+                "открываю": "acknowledgment",
+                "показываю": "acknowledgment",
+                "проверяю": "acknowledgment",
+                "делаю": "acknowledgment",
+                "включаю": "acknowledgment",
+                "загружаю": "acknowledgment",
+                "есть": "acknowledgment",
+                "как пожелаете": "acknowledgment",
+                "запрос выполнен": "acknowledgment",
+                
+                # Завершение
+                "завершаю работу": "completion",
+                "готово": "completion",
+                "принято": "completion",
+                "всегда к вашим услугам": "completion",
+                
+                # Ошибки
+                "ошибка": "error",
+                "неизвестно": "error",
+                "не понял": "error",
+                "чего вы пытаетесь добиться": "error",
+                
+                # Сарказм
+                "очень тонкое замечание": "sarcastic",
+                
+                # Конкретные фразы для точного совпадения
+                "добрый день сэр": "run",
+                "мы подключены и готовы": "ready"
+            }
+            
+            text_lower = text.lower()
+            
+            # Ищем совпадение
+            sound_to_play = None
+            for phrase, sound_category in sound_mapping.items():
+                if phrase in text_lower:
+                    sound_to_play = sound_category
+                    break
+            
+            # Если нашли соответствие - воспроизводим звук
+            if sound_to_play:
+                if sound_to_play in ["acknowledgment", "listening"]:
+                    self.sound_manager.play_random_sound(sound_to_play)
+                elif sound_to_play == "run":
+                    self.sound_manager.play_sound("run")
+                elif sound_to_play == "ready":
+                    self.sound_manager.play_sound("ready")
+                elif sound_to_play == "completion":
+                    self.sound_manager.play_completion_sound()
+                elif sound_to_play == "error":
+                    self.sound_manager.play_error_sound()
+                elif sound_to_play == "sarcastic":
+                    self.sound_manager.play_sarcastic_sound()
+            else:
+                # Если не нашли соответствия, используем случайное подтверждение
+                self.sound_manager.play_acknowledgment()
+            
+        except Exception as e:
+            print(f"Ошибка озвучки: {e}")
+        finally:
+            self.is_speaking = False
     
     def speak_joke(self, joke_text):
         """Озвучить шутку специальным методом"""
@@ -675,6 +688,9 @@ class VoiceInput:
         print("РЕЖИМ ОБЩЕНИЯ")
         print("="*50)
         
+        self.is_llm_mode = True
+        self.llm_tts_only = True
+        
         # Проверяем наличие Ollama
         ollama_paths = [
             r"C:\Users\123\AppData\Local\Programs\Ollama\ollama.exe",
@@ -710,7 +726,7 @@ class VoiceInput:
                                         capture_output=True, 
                                         text=True, 
                                         shell=True,
-                                        timeout=10)
+                                        timeout=30)
             
             if check_result.returncode != 0:
                 print("Запускаю Ollama сервер в фоновом режиме...")
@@ -730,7 +746,7 @@ class VoiceInput:
                                         capture_output=True,
                                         text=True,
                                         shell=True,
-                                        timeout=10)
+                                        timeout=30)
             
             if models_result.returncode != 0:
                 print("Ошибка при получении списка моделей")
@@ -747,7 +763,7 @@ class VoiceInput:
                                             capture_output=True,
                                             text=True,
                                             shell=True,
-                                            timeout=10)
+                                            timeout=30)
             
             models_output = models_result.stdout.lower()
             
@@ -812,8 +828,6 @@ class VoiceInput:
     Ты можешь подыграть и ответить: "Я сам в ахуе, сэр'"""
             
             self.llm_history.append({"role": "system", "content": system_prompt})
-            
-            self.speak("Режим общения активирован.", force=True)
             print(f"Режим LLM активирован. Модель: {default_model}")
             print("Скажите 'Джарвис' для активации, затем задайте вопрос.")
             print("Для выхода скажите 'переключись в обычный режим' или 'выход из режима общения'")
@@ -842,7 +856,7 @@ class VoiceInput:
             
             for i in range(3):
                 try:
-                    response = requests.get("http://localhost:11434/api/tags", timeout=5)
+                    response = requests.get("http://localhost:11434/api/tags", timeout=10)
                     if response.status_code == 200:
                         print("Подключение к Ollama API успешно")
                         return True
@@ -854,99 +868,145 @@ class VoiceInput:
             return False
         except:
             return False
-    
-    def speak_text(text):
-        import pyttsx3
-        engine = pyttsx3.init()
-        engine.say(text)
-        engine.runAndWait()
-
-    def process_llm_query(self, query):
-        """Обработать запрос к LLM - ИСПРАВЛЕННАЯ ВЕРСИЯ"""
-        if not self.is_llm_mode:
-            return None
         
-        print(f"\n[LLM Запрос]: {query}")
+    
+    def speak_llm_response(self, text):
+        """Озвучивание LLM ответов с голосом Vitaliy"""
+        if not text:
+            return False
+        
+        print(f"[ОЗВУЧКА LLM] Получен текст: {text[:100]}...")
         
         try:
-            import requests
-            import json
+            import pyttsx3
             
-            # Добавляем запрос в историю
-            self.llm_history.append({"role": "user", "content": query})
+            # Создаем движок
+            engine = pyttsx3.init()
             
-            # Создаем JSON для запроса с оптимизацией для deepseek
-            request_data = {
-                "model": self.llm_model,
-                "messages": self.llm_history[-6:],  # Берем последние 6 сообщений для контекста
-                "stream": False,
-                "options": {
-                    "temperature": 0.7,
-                    "top_p": 0.9,
-                    "num_ctx": 2048
-                }
-            }
+            # Получаем список голосов для отладки
+            voices = engine.getProperty('voices')
             
-            try:
-                # Отправляем запрос через requests к Ollama API
-                response = requests.post("http://localhost:11434/api/chat",
-                                    json=request_data,
-                                    timeout=60)
-                
-                if response.status_code == 2:
-                    result = response.json()
-                    llm_response = result['message']['content']
-                    
-                    # Очищаем ответ от лишних символов
-                    llm_response = llm_response.strip()
-                    
-                    # Добавляем ответ в историю
-                    self.llm_history.append({"role": "assistant", "content": llm_response})
-                    
-                    # Ограничиваем историю (последние 110 сообщений + системный промпт)
-                    if len(self.llm_history) > 111:  # 1 системный + 110 диалоговых
-                        self.llm_history = [self.llm_history[0]] + self.llm_history[-10:]
-                    
-                    print(f"[LLM Ответ]: {llm_response}...")
-
-                    # ОЗВУЧИВАЕМ ОТВЕТ ЛЛМ
-                    if llm_response:
-                        engine = pyttsx3.init()
-                        voices = engine.getProperty('voices')
-                        voice_id = 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\TokenEnums\RHVoice\Vitaliy'
-                        engine.setProperty('voice', voice_id)
-                        engine.say(llm_response, force=True)
-                        engine.runAndWait()
-
-                    
-                    return llm_response
-                else:
-                    print(f"Ошибка API: {response.status_code}")
-                    error_msg = f"Ошибка подключения к ИИ: {response.status_code}"
-                    self.speak(error_msg, force=True)
-                    return error_msg
-                    
-            except requests.exceptions.ConnectionError:
-                print("Не могу подключиться к Ollama API")
-                error_msg = "Не могу подключиться к ИИ. Проверьте, запущен ли Ollama сервер."
-                self.speak(error_msg, force=True)
-                return error_msg
-            except requests.exceptions.Timeout:
-                print("Таймаут запроса к Ollama API")
-                error_msg = "ИИ не отвечает. Попробуйте позже."
-                self.speak(error_msg, force=True)
-                return error_msg
-            except Exception as e:
-                print(f"Ошибка запроса: {e}")
-                error_msg = f"Ошибка: {str(e)[:50]}"
-                self.speak(error_msg, force=True)
-                return error_msg
-                
+            # Ищем голос Vitaliy
+            vitaliy_voice = None
+            for voice in voices:
+                if 'Vitaliy' in voice.name:
+                    vitaliy_voice = voice
+                    break
+            
+            # Если не нашли Vitaliy, ищем другие русские голоса
+            if not vitaliy_voice:
+                for voice in voices:
+                    voice_lower = voice.name.lower()
+                    voice_id_lower = voice.id.lower()
+                    if any(keyword in voice_lower or keyword in voice_id_lower 
+                        for keyword in ['russian', 'ru', 'russ', 'rur']):
+                        vitaliy_voice = voice
+                        break
+            
+            # Устанавливаем найденный голос
+            if vitaliy_voice:
+                engine.setProperty('voice', vitaliy_voice.id)
+            else:
+                if voices:
+                    engine.setProperty('voice', voices[0].id)
+            
+            # Оптимальные настройки для русского языка
+            engine.setProperty('rate', 160)    # Скорость речи
+            engine.setProperty('volume', 1.0)  # Громкость
+            
+            # Разбиваем длинный текст на предложения
+            import re
+            
+            # Разделители для разбивки текста
+            sentences = re.split(r'(?<=[.!?]) +', text)
+            
+            for sentence in sentences:
+                if sentence.strip():
+                    engine.say(sentence.strip())
+            
+            engine.runAndWait()
+            
+            print("[ОЗВУЧКА LLM] Озвучка завершена успешно")
+            return True
+            
         except Exception as e:
-            print(f"Ошибка обработки LLM запроса: {e}")
-            error_msg = "Произошла ошибка при обработке запроса."
-            self.speak(error_msg, force=True)
-            return error_msg
+            print(f"[ОЗВУЧКА LLM] Ошибка: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # Резервный способ через системную озвучку
+            try:
+                import os
+                # Используем PowerShell для озвучки
+                import subprocess
+                # Экранируем кавычки в тексте
+                safe_text = text.replace('"', "'")
+                cmd = f'powershell -Command "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak(\'{safe_text}\')"'
+                subprocess.run(cmd, shell=True, timeout=60)
+                print("[ОЗВУЧКА LLM] Озвучка через PowerShell завершена")
+                return True
+            except Exception as e2:
+                print(f"[ОЗВУЧКА LLM] Ошибка PowerShell: {e2}")
+                
+                # Последний резерв - звуковой сигнал
+                try:
+                    import winsound
+                    winsound.Beep(1000, 200)
+                except:
+                    pass
+                    
+            return False
+        
+    def _speak_direct(self, text):
+        """Прямая озвучка через pyttsx3 с голосом Vitaliy"""
+        if not text:
+            return False
+        
+        
+        try:
+            import pyttsx3
+            
+            # Создаем новый экземпляр движка для каждой фразы
+            engine = pyttsx3.init()
+            
+            # Ищем голос Vitaliy
+            voices = engine.getProperty('voices')
+            vitaliy_voice = None
+            
+            for voice in voices:
+                if 'Vitaliy' in voice.name:
+                    vitaliy_voice = voice
+                    break
+            
+            if vitaliy_voice:
+                engine.setProperty('voice', vitaliy_voice.id)
+            else:
+                # Используем первый русский голос как запасной
+                for voice in voices:
+                    if 'vitaliy' in voice.name or 'Vitaliy' in voice.id:
+                        engine.setProperty('voice', voice.id)
+                        break
+            
+            # Настройки для четкости
+            engine.setProperty('rate', 160)  # Скорость речи
+            engine.setProperty('volume', 1.0)  # Громкость
+            
+            # Озвучиваем
+            engine.say(text)
+            engine.runAndWait()
+            return True
+            
+        except Exception as e:
+            print(f"[ОЗВУЧКА] Ошибка: {e}")
+            
+            # Резервный вариант через системные команды
+            try:
+                import os
+                # Используем PowerShell для озвучки
+                os.system(f'powershell -Command "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak(\'{text}\')"')
+                return True
+            except:
+                return False
 
     def stop_llm_mode(self):
         """Остановить режим общения с LLM"""
@@ -955,6 +1015,7 @@ class VoiceInput:
         
         print("Завершаю режим общения с LLM...")
         self.is_llm_mode = False
+        self.llm_tts_only = False
         
         # Останавливаем процесс Ollama если мы его запускали
         if self.llm_process:
@@ -973,58 +1034,6 @@ class VoiceInput:
         print("Режим LLM остановлен")
         return True
     
-    def process_llm_query(self, query):
-        """Обработать запрос к LLM"""
-        if not self.is_llm_mode:
-            return None
-        
-        try:
-            import subprocess
-            import json
-            
-            # Добавляем запрос в историю
-            self.llm_history.append({"role": "user", "content": query})
-            
-            # Создаем JSON для запроса
-            request_data = {
-                "model": self.llm_model,
-                "messages": self.llm_history,
-                "stream": False
-            }
-            
-            # Отправляем запрос через curl к Ollama API
-            import requests
-            try:
-                response = requests.post("http://localhost:11434/api/chat",
-                                       json=request_data,
-                                       timeout=60)
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    llm_response = result['message']['content']
-                    
-                    # Добавляем ответ в историю
-                    self.llm_history.append({"role": "assistant", "content": llm_response})
-                    
-                    # Ограничиваем историю (последние 10 сообщений)
-                    if len(self.llm_history) > 200:  # 1 системный + 199 диалоговых
-                        self.llm_history = [self.llm_history[0]] + self.llm_history[-19:]
-                    
-                    return llm_response
-                else:
-                    print(f"Ошибка API: {response.status_code}")
-                    return "Извините, возникла ошибка при обработке запроса."
-                    
-            except requests.exceptions.ConnectionError:
-                print("Не могу подключиться к Ollama API")
-                return "Не могу подключиться к Ollama. Проверьте, запущен ли Ollama сервер."
-            except Exception as e:
-                print(f"Ошибка запроса: {e}")
-                return f"Ошибка: {str(e)[:50]}"
-                
-        except Exception as e:
-            print(f"Ошибка обработки LLM запроса: {e}")
-            return "Произошла ошибка при обработке запроса."
     
     def start_activation_mode(self, desktop, cursor):
         """Запустить режим постоянного прослушивания с активацией по фразе"""
@@ -1531,135 +1540,133 @@ class VoiceInput:
         text = re.sub(r'\s+', ' ', text).strip()
         
         return text
-
-    # Обновим process_llm_query:
+    
     def process_llm_query(self, query):
-        """Обработать запрос к LLM - ИСПРАВЛЕННАЯ ВЕРСИЯ БЕЗ ОЗВУЧКИ"""
+        """Обработка LLM запросов с улучшенной обработкой ошибок"""
         if not self.is_llm_mode:
+            print("[LLM] Режим не активен")
             return None
-        
-        print(f"\n[LLM Запрос]: {query}")
-        
+
+        print(f"[LLM] Запрос: {query}")
+
         try:
             import requests
             import json
-            
-            # Добавляем запрос в историю
-            self.llm_history.append({"role": "user", "content": query})
-            
-            # Создаем JSON для запроса с оптимизацией для deepseek
+
+            # Формируем запрос для Ollama
             request_data = {
                 "model": self.llm_model,
-                "messages": self.llm_history[-6:],  # Берем последние 6 сообщений для контекста
-                "stream": False,
-                "options": {
-                    "temperature": 0.7,
-                    "top_p": 0.9,
-                    "num_ctx": 2048
-                }
+                "prompt": query,
+                "stream": False
             }
-            
-            try:
-                # Отправляем запрос через requests к Ollama API
-                response = requests.post("http://localhost:11434/api/chat",
-                                    json=request_data,
-                                    timeout=60)
+
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json=request_data,
+                timeout=60
+            )
+
+            if response.status_code == 200:
+                result = response.json()
                 
-                if response.status_code == 200:
-                    result = response.json()
-                    llm_response = result['message']['content']
-                    
-                    # Добавляем ответ в историю
-                    self.llm_history.append({"role": "assistant", "content": llm_response})
-                    
-                    # Ограничиваем историю (последние 10 сообщений + системный промпт)
-                    if len(self.llm_history) > 11:  # 1 системный + 10 диалоговых
-                        self.llm_history = [self.llm_history[0]] + self.llm_history[-10:]
-                    
-                    print(f"[LLM Ответ]: {llm_response}...")
-                    
-                    # ВОЗВРАЩАЕМ ТОЛЬКО ТЕКСТ, НЕ ОЗВУЧИВАЕМ ЗДЕСЬ
-                    return llm_response
-                    
+                # Извлекаем ответ
+                llm_response = ""
+                if "response" in result:
+                    llm_response = result["response"].strip()
                 else:
-                    print(f"Ошибка API: {response.status_code}")
-                    error_msg = f"Ошибка подключения к ИИ: {response.status_code}"
-                    return error_msg
-                    
-            except requests.exceptions.ConnectionError:
-                print("Не могу подключиться к Ollama API")
-                error_msg = "Не могу подключиться к ИИ. Проверьте, запущен ли Ollama сервер."
-                return error_msg
-            except requests.exceptions.Timeout:
-                print("Таймаут запроса к Ollama API")
-                error_msg = "ИИ не отвечает. Попробуйте позже."
-                return error_msg
-            except Exception as e:
-                print(f"Ошибка запроса: {e}")
-                error_msg = f"Ошибка: {str(e)[:50]}"
-                return error_msg
+                    # Альтернативные пути к ответу
+                    llm_response = str(result).strip()
+
+                print(f"[LLM] Ответ получен: {llm_response[:200]}...")
+
+                # ОЗВУЧИВАЕМ ОТВЕТ - ОСНОВНОЕ ИСПРАВЛЕНИЕ
+                if llm_response:
+                    print("[LLM] Начинаю озвучку ответа...")
+                    success = self.speak_llm_response(llm_response)
+                    if not success:
+                        print("[LLM] Озвучка не удалась, но ответ получен")
                 
-        except Exception as e:
-            print(f"Ошибка обработки LLM запроса: {e}")
-            error_msg = "Произошла ошибка при обработке запроса."
+                return llm_response
+            else:
+                error_msg = f"Ошибка HTTP {response.status_code}"
+                print(f"[LLM] {error_msg}")
+                self.speak_llm_response("Ошибка получения ответа от ИИ")
+                return error_msg
+
+        except requests.exceptions.Timeout:
+            error_msg = "Таймаут подключения к Ollama"
+            print(f"[LLM] {error_msg}")
+            self.speak_llm_response("Таймаут подключения к ИИ")
             return error_msg
+            
+        except requests.exceptions.ConnectionError:
+            error_msg = "Не удалось подключиться к Ollama"
+            print(f"[LLM] {error_msg}")
+            self.speak_llm_response("Ошибка подключения к ИИ")
+            return error_msg
+            
+        except Exception as e:
+            error_msg = f"Исключение: {str(e)}"
+            print(f"[LLM] {error_msg}")
+            self.speak_llm_response("Ошибка обработки запроса")
+            return error_msg
+
 
     def process_llm_query_with_speech(self, query):
         """Обработать LLM запрос с озвучкой - ОСНОВНОЙ МЕТОД ДЛЯ ОЗВУЧКИ"""
         if not self.is_llm_mode:
-            self.speak("Режим ИИ не активен.", force=True)
+            self.speak_llm_response("Режим ИИ не активен.")
             return None
         
         # Сначала говорим, что обрабатываем
         self.speak("Обрабатываю запрос", force=True)
-        time.sleep(0.3)  # Даем время для завершения озвучки
+        time.sleep(0.3)
         
-        # Затем обрабатываем запрос (БЕЗ озвучки внутри)
+        # Затем обрабатываем запрос с гарантированной озвучкой
         llm_response = self.process_llm_query(query)
         
         if llm_response:
-            # Озвучиваем ответ через основной механизм
-            self.speak(llm_response, force=True)
+            # Уже озвучено внутри process_llm_query
             return llm_response
         else:
-            self.speak("Не удалось получить ответ от ИИ.", force=True)
+            self.speak_llm_response("Не удалось получить ответ от ИИ.")
             return None
         
     def process_voice_command(self, text, desktop, cursor):
-        """Обработать голосовую команду - ОБНОВЛЕННЫЙ"""
-        if self.process_custom_command(text, desktop, cursor):
-            return "custom_command_processed"
-        # Если в режиме LLM
-        if self.is_llm_mode:
-            # Проверяем, содержит ли текст активационную фразу
-            text_lower = text.lower()
-            if self.activation_phrase in text_lower:
-                query = self.intelligent_llm_processing(text)
-                
-                if query:
-                    print(f"Запрос к LLM: {query}")
-                    # Используем функцию с озвучкой
-                    response = self.process_llm_query_with_speech(query)
-                    return "llm_processed"
+        """Обработка голосовых команд с приоритетом LLM режима"""
+        # ЕСЛИ МЫ В РЕЖИМЕ LLM И ЕСТЬ АКТИВАЦИОННАЯ ФРАЗА - ОБРАБАТЫВАЕМ КАК LLM ЗАПРОС
+        print(f"[DEBUG] process_voice_command вызван с: {text}")
+        print(f"[DEBUG] is_llm_mode: {self.is_llm_mode}")
+        if self.is_llm_mode and self.activation_phrase in text.lower():
+            # Извлекаем запрос (убираем активационную фразу)
+            query = text.lower().replace(self.activation_phrase, "").strip()
+            
+            if query:
+                print(f"[VOICE] LLM запрос: '{query}'")
+                return self.process_llm_query(query)
+            else:
+                # Если только активационная фраза - подтверждаем готовность
+                self._speak_direct("Слушаю ваш вопрос")
+                return "listening"
     
         # Продолжаем обычную обработку команд
-        cmd_type, params = self.parse_command(text)
-        if self.is_llm_mode:
-            if self.activation_phrase in text.lower():
-                query = text.lower().strip()
-                stop_words = ["  "]
-                for word in stop_words:
-                    query = query.replace(word, "").strip()
-                
-                if query:
-                    print(f"Запрос к LLM: {query}")
-                    self.speak("Обрабатываю запрос", force=True)
-                    
-                    # Обрабатываем запрос
-                    response = self.process_llm_query(query)
-                    return "llm_processed"
+        if self.process_custom_command(text, desktop, cursor):
+            return "custom_command_processed"
         
         cmd_type, params = self.parse_command(text)
+        
+        # В режиме LLM пропускаем озвучку стандартных команд
+        if self.is_llm_mode:
+            # Только выполнение команды без озвучки
+            if cmd_type == "exit":
+                self.stop_llm_mode()
+                return "exit"
+            elif cmd_type == "stop_llm":
+                self.stop_llm_mode()
+                return "llm_stopped"
+            else:
+                # Для других команд в режиме LLM просто возвращаем результат
+                return cmd_type
         
         # Маппинг команд на доступные фразы
         response_map = {
@@ -1724,7 +1731,7 @@ class VoiceInput:
             response = "Готово"
         
         # Озвучиваем ответ (КРОМЕ шуток и LLM режима)
-        if cmd_type != "joke" and response and cmd_type != "llm_query":
+        if cmd_type != "joke" and response and not self.is_llm_mode:
             self.speak(response, force=True)
         
         # Выполняем команду

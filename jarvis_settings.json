@@ -22,14 +22,14 @@
     },
     "reaction": {
         "reactor_speed": 0.5,
-        "auto_reactor": false,
+        "auto_reactor": true,
         "reactor_duration": 10.0
     },
     "llm": {
         "enabled": false,
         "model": "deepseek-r1:8b",
         "ollama_path": "C:\\Users\\123\\AppData\\Local\\Programs\\Ollama\\ollama.exe",
-        "system_prompt": "Ты - Джарвис, голосовой помощник. Отвечай кратко и по делу. Будь вежливым и полезным. Отвечай на русском языке."
+        "system_prompt": "Ты — Джарвис, голосовой помощник на русском языке. Отвечай только по-русски. Если ты не знаете ответа, скажите мне честно. Твои ответы должны быть короткими — максимум 2–3 предложения."
     },
     "hotkeys": {
         "global_hotkey": "ctrl+alt+j",
