@@ -14,6 +14,8 @@ sys
 from voice_input import VoiceInput
 from commands_interface import CommandsInterface
 from custom_commands import CustomCommandsManager
+from commands_interface import CommandEntry
+from commands_interface import UniversalCommandEntry
 
 # Добавляем текущую папку в путь
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -262,6 +264,25 @@ class ReactorCanvas(tk.Canvas):
         
         except Exception as e:
             pass
+
+    def on_closing(self):
+        """Обработка закрытия окна"""
+        # Останавливаем всю озвучку
+        if hasattr(self, 'voice'):
+            self.voice.stop_all_speech()
+        
+        self.voice_mode_active = False
+        
+        # Останавливаем режим LLM если активен
+        if hasattr(self.voice, 'stop_llm_mode'):
+            self.voice.stop_llm_mode()
+        
+        if hasattr(self, 'original_stdout'):
+            sys.stdout = self.original_stdout
+        
+        self.add_status_message("Завершение работы ДЖАРВИСА...", 
+                            self.colors['text'])
+        self.root.after(1000, self.root.destroy())
     
     def get_segment_color(self, intensity, power_factor):
         """Получить цвет сегмента"""
@@ -943,24 +964,24 @@ class JarvisVisual:
                 fg=self.colors['accent'],
                 bg=self.colors['bg']).pack(side=tk.LEFT, padx=(0, 10))
         
-        # Поле ввода команд
-        self.command_entry = tk.Entry(command_frame,
-                                     font=('Courier', 10),
-                                     bg='#222222',
-                                     fg=self.colors['text'],
-                                     insertbackground=self.colors['text'],
-                                     width=50)
+        # ЗАМЕНА: Используем CommandEntry вместо обычного Entry
+        self.command_entry = UniversalCommandEntry(command_frame,
+                                         font=('Courier', 10),
+                                         bg='#222222',
+                                         fg=self.colors['text'],
+                                         insertbackground=self.colors['text'],
+                                         width=50)
         self.command_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
         self.command_entry.bind('<Return>', self.process_command_input)
         
         # Кнопка отправки
         tk.Button(command_frame,
-                 text="Отправить",
-                 font=('Courier', 9),
-                 bg='#222222',
-                 fg=self.colors['accent'],
-                 command=lambda: self.process_command_input(None),
-                 width=10).pack(side=tk.LEFT)
+                text="Отправить",
+                font=('Courier', 9),
+                bg='#222222',
+                fg=self.colors['accent'],
+                command=lambda: self.process_command_input(None),
+                width=10).pack(side=tk.LEFT)
         
         # Подсказка
         tk.Label(command_frame,

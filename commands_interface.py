@@ -4,6 +4,335 @@ from tkinter import ttk, messagebox
 import json
 import os
 from custom_commands import CustomCommandsManager
+from clipboard_manager import UniversalClipboard
+
+class UniversalCommandEntry(tk.Entry):
+    """Entry с универсальной поддержкой копирования/вставки"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Создаем контекстное меню
+        self.context_menu = tk.Menu(self, tearoff=0, bg='#333333', fg='white')
+        self.context_menu.add_command(label="Вырезать", command=self.cut_text)
+        self.context_menu.add_command(label="Копировать", command=self.copy_text)
+        self.context_menu.add_command(label="Вставить", command=self.paste_text)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Выделить все", command=self.select_all_text)
+        
+        # Привязываем правую кнопку мыши
+        self.bind("<Button-3>", self.show_context_menu)
+        
+        # Горячие клавиши
+        self.bind('<Control-c>', self.copy_text)
+        self.bind('<Control-v>', self.paste_text)
+        self.bind('<Control-x>', self.cut_text)
+        self.bind('<Control-a>', self.select_all_text)
+        
+        # Для Linux - средняя кнопка мыши
+        self.bind('<Button-2>', self.paste_text)
+        
+        # Захватываем фокус для отладки
+        self.bind('<FocusIn>', self.on_focus_in)
+
+    def on_focus_in(self, event):
+        """При получении фокуса"""
+        print(f"")
+
+    def show_context_menu(self, event):
+        """Показать контекстное меню"""
+        try:
+            self.context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.context_menu.grab_release()
+    
+    def cut_text(self, event=None):
+        """Вырезать текст"""
+        try:
+            if self.selection_present():
+                # Сначала копируем
+                self.copy_text()
+                # Затем удаляем выделенное
+                start = self.index(tk.SEL_FIRST)
+                end = self.index(tk.SEL_LAST)
+                self.delete(start, end)
+                # Перемещаем курсор на место удаления
+                self.icursor(start)
+        except Exception as e:
+            print(f"Ошибка вырезания: {e}")
+        return "break"
+    
+    def copy_text(self, event=None):
+        """Копировать текст"""
+        try:
+            if self.selection_present():
+                # Получаем выделенный текст
+                start = self.index(tk.SEL_FIRST)
+                end = self.index(tk.SEL_LAST)
+                selected_text = self.get()[start:end]
+                
+                if selected_text:
+                    # Используем универсальный буфер обмена
+                    success = UniversalClipboard.copy(selected_text)
+                    if not success:
+                        # Запасной вариант через Tkinter
+                        self.clipboard_clear()
+                        self.clipboard_append(selected_text)
+        except Exception as e:
+            print(f"Ошибка копирования: {e}")
+        return "break"
+    
+    def paste_text(self, event=None):
+        """Вставить текст - УЛУЧШЕННАЯ ВЕРСИЯ С ЗАЩИТОЙ ОТ None"""
+        try:
+            # Получаем текст из буфера обмена
+            clipboard_text = UniversalClipboard.paste()
+            
+            # Защита от None и пустого текста
+            if clipboard_text is None:
+                clipboard_text = ""
+            else:
+                clipboard_text = str(clipboard_text)  # На всякий случай преобразуем в строку
+            
+            if clipboard_text.strip():
+                # Если есть выделенный текст - удаляем его
+                if self.selection_present():
+                    start = self.index(tk.SEL_FIRST)
+                    end = self.index(tk.SEL_LAST)
+                    self.delete(start, end)
+                    insert_pos = start
+                else:
+                    insert_pos = self.index(tk.INSERT)
+                
+                # Вставляем текст
+                self.insert(insert_pos, clipboard_text)
+                
+                # Перемещаем курсор после вставленного текста
+                new_pos = insert_pos + len(clipboard_text)
+                self.icursor(new_pos)
+                self.select_clear()
+                
+            else:
+                print("Буфер обмена пуст или текст не получен")
+        except Exception as e:
+            print(f"Ошибка вставки: {e}")
+            # Пробуем стандартный метод как последнюю попытку
+            try:
+                self.event_generate('<<Paste>>')
+            except:
+                pass
+        return "break"
+    
+    def select_all_text(self, event=None):
+        """Выделить весь текст"""
+        try:
+            self.selection_range(0, tk.END)
+            self.icursor(tk.END)
+        except Exception as e:
+            print(f"Ошибка выделения: {e}")
+        return "break"
+
+class UniversalCommandText(tk.Text):
+    """Text с универсальной поддержкой копирования/вставки"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Создаем контекстное меню
+        self.context_menu = tk.Menu(self, tearoff=0, bg='#333333', fg='white')
+        self.context_menu.add_command(label="Вырезать", command=self.cut_text)
+        self.context_menu.add_command(label="Копировать", command=self.copy_text)
+        self.context_menu.add_command(label="Вставить", command=self.paste_text)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Выделить все", command=self.select_all_text)
+        
+        # Привязываем правую кнопку мыши
+        self.bind("<Button-3>", self.show_context_menu)
+        
+        # Горячие клавиши
+        self.bind('<Control-c>', self.copy_text)
+        self.bind('<Control-v>', self.paste_text)
+        self.bind('<Control-x>', self.cut_text)
+        self.bind('<Control-a>', self.select_all_text)
+        
+        # Для Linux - средняя кнопка мыши
+        self.bind('<Button-2>', self.paste_text)
+        
+        # Захватываем фокус для отладки
+        self.bind('<FocusIn>', self.on_focus_in)
+
+    def on_focus_in(self, event):
+        """При получении фокуса"""
+        print(f"Текстовое поле получило фокус")
+
+    def show_context_menu(self, event):
+        """Показать контекстное меню"""
+        try:
+            self.context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.context_menu.grab_release()
+    
+    def cut_text(self, event=None):
+        """Вырезать текст"""
+        try:
+            if self.tag_ranges(tk.SEL):
+                # Сначала копируем
+                self.copy_text()
+                # Затем удаляем выделенное
+                self.delete(tk.SEL_FIRST, tk.SEL_LAST)
+        except Exception as e:
+            print(f"Ошибка вырезания: {e}")
+        return "break"
+    
+    def copy_text(self, event=None):
+        """Копировать текст"""
+        try:
+            if self.tag_ranges(tk.SEL):
+                # Получаем выделенный текст
+                selected_text = self.get(tk.SEL_FIRST, tk.SEL_LAST)
+                
+                if selected_text:
+                    # Используем универсальный буфер обмена
+                    success = UniversalClipboard.copy(selected_text)
+                    if not success:
+                        # Запасной вариант через Tkinter
+                        self.clipboard_clear()
+                        self.clipboard_append(selected_text)
+        except Exception as e:
+            print(f"Ошибка копирования: {e}")
+        return "break"
+    
+    def paste_text(self, event=None):
+        """Вставить текст - УНИВЕРСАЛЬНЫЙ МЕТОД"""
+        try:
+            # Получаем текст из буфера обмена
+            clipboard_text = UniversalClipboard.paste()
+            
+            if not clipboard_text:
+                # Пробуем Tkinter как запасной вариант
+                try:
+                    clipboard_text = self.clipboard_get()
+                except:
+                    clipboard_text = ""
+            
+            if clipboard_text and clipboard_text.strip():
+                
+                # Если есть выделение - удаляем его
+                if self.tag_ranges(tk.SEL):
+                    self.delete(tk.SEL_FIRST, tk.SEL_LAST)
+                
+                # Вставляем текст в позицию курсора
+                self.insert(tk.INSERT, clipboard_text)
+            else:
+                print("Буфер обмена пуст или текст не получен")
+        except Exception as e:
+            print(f"Ошибка вставки: {e}")
+            # Пробуем стандартный метод как последнюю попытку
+            try:
+                self.event_generate('<<Paste>>')
+            except:
+                pass
+        return "break"
+    
+    def select_all_text(self, event=None):
+        """Выделить весь текст"""
+        try:
+            self.tag_add(tk.SEL, "1.0", tk.END)
+            self.mark_set(tk.INSERT, "1.0")
+            self.see(tk.INSERT)
+        except Exception as e:
+            print(f"Ошибка выделения: {e}")
+        return "break"
+
+# Заменяем старые классы на новые
+CommandEntry = UniversalCommandEntry
+CommandText = UniversalCommandText
+    
+class CommandEntry(tk.Entry):
+    """Entry с полноценной поддержкой копирования/вставки"""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Создаем контекстное меню
+        self.context_menu = tk.Menu(self, tearoff=0, bg='#333333', fg='white')
+        self.context_menu.add_command(label="Вырезать", command=self.cut_text)
+        self.context_menu.add_command(label="Копировать", command=self.copy_text)
+        self.context_menu.add_command(label="Вставить", command=self.paste_text)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Выделить все", command=self.select_all_text)
+        
+        # Привязываем правую кнопку мыши
+        self.bind("<Button-3>", self.show_context_menu)
+        
+        # Горячие клавиши - более надежная реализация
+        self.bind('<Control-c>', self.copy_text)
+        self.bind('<Control-v>', self.paste_text)
+        self.bind('<Control-x>', self.cut_text)
+        self.bind('<Control-a>', self.select_all_text)
+        
+        # Для Windows/Linux/Mac
+        self.bind('<Button-2>', self.paste_text)  # Средняя кнопка мыши
+
+    def show_context_menu(self, event):
+        """Показать контекстное меню"""
+        try:
+            self.context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.context_menu.grab_release()
+    
+    def cut_text(self, event=None):
+        """Вырезать текст с улучшенной обработкой"""
+        try:
+            if self.selection_present():
+                self.event_generate('<<Cut>>')
+        except Exception as e:
+            print(f"Ошибка вырезания: {e}")
+        return "break"
+    
+    def copy_text(self, event=None):
+        """Копировать текст с улучшенной обработкой"""
+        try:
+            if self.selection_present():
+                self.event_generate('<<Copy>>')
+        except Exception as e:
+            print(f"Ошибка копирования: {e}")
+        return "break"
+    
+    def paste_text(self, event=None):
+        """Вставить текст - УЛУЧШЕННАЯ ВЕРСИЯ"""
+        try:
+            # Получаем текст из буфера обмена
+            clipboard_text = self.clipboard_get()
+            
+            if clipboard_text.strip():
+                # Если есть выделенный текст - удаляем его
+                if self.selection_present():
+                    start = self.index(tk.SEL_FIRST)
+                    end = self.index(tk.SEL_LAST)
+                    self.delete(start, end)
+                    self.icursor(start)  # Устанавливаем курсор на место удаления
+                
+                # Вставляем текст в позицию курсора
+                cursor_pos = self.index(tk.INSERT)
+                self.insert(cursor_pos, clipboard_text)
+                
+                # Перемещаем курсор после вставленного текста
+                self.icursor(cursor_pos + len(clipboard_text))
+        except Exception as e:
+            # Резервный метод
+            try:
+                self.event_generate('<<Paste>>')
+            except Exception as e2:
+                print(f"Ошибка вставки: {e2}")
+        
+        return "break"
+    
+    def select_all_text(self, event=None):
+        """Выделить весь текст"""
+        try:
+            self.selection_range(0, tk.END)
+            self.icursor(tk.END)
+        except Exception as e:
+            print(f"Ошибка выделения: {e}")
+        return "break"
 
 class CommandsInterface:
     def __init__(self, parent, colors, commands_manager):
@@ -47,7 +376,7 @@ class CommandsInterface:
         tk.Label(frame, text="Название команды:", bg=self.colors['bg'], fg=self.colors['text'],
                 font=('Arial', 11, 'bold')).pack(anchor=tk.W, padx=10, pady=(10, 5))
         
-        self.command_name = tk.Entry(frame, bg='#222222', fg=self.colors['text'], width=30)
+        self.command_name = CommandEntry(frame, bg='#222222', fg=self.colors['text'], width=30)
         self.command_name.pack(anchor=tk.W, padx=10, pady=5)
         
         # Тип команды
@@ -87,7 +416,7 @@ class CommandsInterface:
             widget.destroy()
         
         tk.Label(self.params_frame, text="URL адрес:", bg=self.colors['bg'], fg=self.colors['text']).pack(anchor=tk.W)
-        self.url_entry = tk.Entry(self.params_frame, bg='#222222', fg=self.colors['text'], width=50)
+        self.url_entry = CommandEntry(self.params_frame, bg='#222222', fg=self.colors['text'], width=50)
         self.url_entry.pack(fill=tk.X, pady=5)
         self.url_entry.insert(0, "https://")
     
@@ -97,7 +426,7 @@ class CommandsInterface:
             widget.destroy()
         
         tk.Label(self.params_frame, text="Путь к программе:", bg=self.colors['bg'], fg=self.colors['text']).pack(anchor=tk.W)
-        self.program_entry = tk.Entry(self.params_frame, bg='#222222', fg=self.colors['text'], width=50)
+        self.program_entry = CommandEntry(self.params_frame, bg='#222222', fg=self.colors['text'], width=50)
         self.program_entry.pack(fill=tk.X, pady=5)
         
         tk.Button(self.params_frame, text="Выбрать файл", bg='#333333', fg=self.colors['text'],
@@ -109,7 +438,7 @@ class CommandsInterface:
             widget.destroy()
         
         tk.Label(self.params_frame, text="Клавиши (через + для комбинаций):", bg=self.colors['bg'], fg=self.colors['text']).pack(anchor=tk.W)
-        self.keys_entry = tk.Entry(self.params_frame, bg='#222222', fg=self.colors['text'], width=50)
+        self.keys_entry = CommandEntry(self.params_frame, bg='#222222', fg=self.colors['text'], width=50)
         self.keys_entry.pack(fill=tk.X, pady=5)
         self.keys_entry.insert(0, "ctrl+c")
         
@@ -122,7 +451,7 @@ class CommandsInterface:
             widget.destroy()
         
         tk.Label(self.params_frame, text="Текст для печати:", bg=self.colors['bg'], fg=self.colors['text']).pack(anchor=tk.W)
-        self.text_entry = tk.Text(self.params_frame, bg='#222222', fg=self.colors['text'], height=4, width=50)
+        self.text_entry = CommandText(self.params_frame, bg='#222222', fg=self.colors['text'], height=4, width=50)
         self.text_entry.pack(fill=tk.X, pady=5)
     
     def create_move_params(self):
@@ -134,12 +463,12 @@ class CommandsInterface:
         coords_frame.pack(fill=tk.X, pady=5)
         
         tk.Label(coords_frame, text="X координата:", bg=self.colors['bg'], fg=self.colors['text']).pack(side=tk.LEFT)
-        self.x_entry = tk.Entry(coords_frame, bg='#222222', fg=self.colors['text'], width=10)
+        self.x_entry = CommandEntry(coords_frame, bg='#222222', fg=self.colors['text'], width=10)
         self.x_entry.pack(side=tk.LEFT, padx=5)
         self.x_entry.insert(0, "100")
         
         tk.Label(coords_frame, text="Y координата:", bg=self.colors['bg'], fg=self.colors['text']).pack(side=tk.LEFT)
-        self.y_entry = tk.Entry(coords_frame, bg='#222222', fg=self.colors['text'], width=10)
+        self.y_entry = CommandEntry(coords_frame, bg='#222222', fg=self.colors['text'], width=10)
         self.y_entry.pack(side=tk.LEFT, padx=5)
         self.y_entry.insert(0, "100")
         
@@ -156,12 +485,12 @@ class CommandsInterface:
         coords_frame.pack(fill=tk.X, pady=5)
         
         tk.Label(coords_frame, text="X координата:", bg=self.colors['bg'], fg=self.colors['text']).pack(side=tk.LEFT)
-        self.click_x_entry = tk.Entry(coords_frame, bg='#222222', fg=self.colors['text'], width=10)
+        self.click_x_entry = CommandEntry(coords_frame, bg='#222222', fg=self.colors['text'], width=10)
         self.click_x_entry.pack(side=tk.LEFT, padx=5)
         self.click_x_entry.insert(0, "100")
         
         tk.Label(coords_frame, text="Y координата:", bg=self.colors['bg'], fg=self.colors['text']).pack(side=tk.LEFT)
-        self.click_y_entry = tk.Entry(coords_frame, bg='#222222', fg=self.colors['text'], width=10)
+        self.click_y_entry = CommandEntry(coords_frame, bg='#222222', fg=self.colors['text'], width=10)
         self.click_y_entry.pack(side=tk.LEFT, padx=5)
         self.click_y_entry.insert(0, "100")
         
@@ -298,7 +627,7 @@ class CommandsInterface:
         tk.Label(frame, text="Название последовательности:", bg=self.colors['bg'], fg=self.colors['text'],
                 font=('Arial', 11, 'bold')).pack(anchor=tk.W, padx=10, pady=(10, 5))
         
-        self.sequence_name = tk.Entry(frame, bg='#222222', fg=self.colors['text'], width=30)
+        self.sequence_name = CommandEntry(frame, bg='#222222', fg=self.colors['text'], width=30)
         self.sequence_name.pack(anchor=tk.W, padx=10, pady=5)
         
         # Список доступных команд
@@ -350,8 +679,8 @@ class CommandsInterface:
                 bg=self.colors['bg'], fg=self.colors['text']).pack(side=tk.LEFT)
         
         self.delay_var = tk.StringVar(value="1.0")
-        delay_entry = tk.Entry(delay_frame, textvariable=self.delay_var, bg='#222222', 
-                             fg=self.colors['text'], width=5)
+        delay_entry = CommandEntry(delay_frame, textvariable=self.delay_var, bg='#222222', 
+                                 fg=self.colors['text'], width=5)
         delay_entry.pack(side=tk.LEFT, padx=5)
         
         # Кнопка создания последовательности
@@ -431,7 +760,7 @@ class CommandsInterface:
             messagebox.showerror("Ошибка", "Не удалось создать последовательность")
     
     def create_manage_tab(self, notebook):
-        """Вкладка управления командами - ИСПРАВЛЕННЫЙ ТОЛЬКО TREEVIEW"""
+        """Вкладка управления командами"""
         frame = tk.Frame(notebook, bg=self.colors['bg'])
         notebook.add(frame, text="Управление")
         
@@ -537,7 +866,7 @@ class CommandsInterface:
         self.refresh_lists()
 
     def refresh_lists(self):
-        """Обновить списки команд и последовательностей - ИСПРАВЛЕННОЕ ОТОБРАЖЕНИЕ"""
+        """Обновить списки команд и последовательностей"""
         # Очищаем деревья
         for item in self.commands_tree.get_children():
             self.commands_tree.delete(item)
@@ -545,21 +874,20 @@ class CommandsInterface:
         for item in self.sequences_tree.get_children():
             self.sequences_tree.delete(item)
         
-        # ЗАГРУЗКА КОМАНД - ПРАВИЛЬНОЕ ОТОБРАЖЕНИЕ
+        # Загружаем команды
         for name, data in self.commands_manager.commands.items():
             self.commands_tree.insert('', tk.END, values=(name, data['type'], data['created']))
         
-        # ЗАГРУЗКА ПОСЛЕДОВАТЕЛЬНОСТЕЙ - ПРАВИЛЬНОЕ ОТОБРАЖЕНИЕ
+        # Загружаем последовательности
         for name, data in self.commands_manager.sequences.items():
             action_count = len(data['actions'])
             self.sequences_tree.insert('', tk.END, values=(name, action_count, data['created']))
         
         # Обновляем список команд для вкладки последовательностей
         self.load_commands_to_list()
-
     
     def delete_command(self):
-        """Удалить выбранную команду - ИСПРАВЛЕННАЯ ВЕРСИЯ"""
+        """Удалить выбранную команду"""
         selection = self.commands_tree.selection()
         if not selection:
             messagebox.showwarning("Предупреждение", "Выберите команду для удаления")
@@ -567,7 +895,7 @@ class CommandsInterface:
         
         item = selection[0]
         values = self.commands_tree.item(item)['values']
-        name = values[0] if values else ""  # Берем имя из первого столбца
+        name = values[0] if values else ""
         
         if not name:
             messagebox.showerror("Ошибка", "Не удалось определить имя команды")
@@ -581,7 +909,7 @@ class CommandsInterface:
                 messagebox.showerror("Ошибка", "Не удалось удалить команду")
 
     def delete_sequence(self):
-        """Удалить выбранную последовательность - ИСПРАВЛЕННАЯ ВЕРСИЯ"""
+        """Удалить выбранную последовательность"""
         selection = self.sequences_tree.selection()
         if not selection:
             messagebox.showwarning("Предупреждение", "Выберите последовательность для удаления")
@@ -589,7 +917,7 @@ class CommandsInterface:
         
         item = selection[0]
         values = self.sequences_tree.item(item)['values']
-        name = values[0] if values else ""  # Берем имя из первого столбца
+        name = values[0] if values else ""
         
         if not name:
             messagebox.showerror("Ошибка", "Не удалось определить имя последовательности")
@@ -603,10 +931,9 @@ class CommandsInterface:
                 messagebox.showerror("Ошибка", "Не удалось удалить последовательность")
 
     def execute_command(self):
-        """Выполнить выбранную команду - БЕЗ ВСПЛЫВАЮЩЕГО ОКНА"""
+        """Выполнить выбранную команду"""
         selection = self.commands_tree.selection()
         if not selection:
-            # Оставляем предупреждение, но не результат
             messagebox.showwarning("Предупреждение", "Выберите команду для выполнения")
             return
         
@@ -618,7 +945,7 @@ class CommandsInterface:
             messagebox.showerror("Ошибка", "Не удалось определить имя команды")
             return
             
-        # Выполняем команду и выводим результат в терминал
+        # Выполняем команду
         success, message = self.commands_manager.execute_command(name)
         
         # Закрываем окно команд после выполнения
@@ -637,10 +964,9 @@ class CommandsInterface:
             print(f"Команда '{name}': {message}")
 
     def execute_sequence(self):
-        """Выполнить выбранную последовательность - БЕЗ ВСПЛЫВАЮЩЕГО ОКНА"""
+        """Выполнить выбранную последовательность"""
         selection = self.sequences_tree.selection()
         if not selection:
-            # Оставляем предупреждение, но не результат
             messagebox.showwarning("Предупреждение", "Выберите последовательность для выполнения")
             return
         
@@ -652,7 +978,7 @@ class CommandsInterface:
             messagebox.showerror("Ошибка", "Не удалось определить имя последовательности")
             return
             
-        # Выполняем последовательность и выводим результат в терминал
+        # Выполняем последовательность
         success, message = self.commands_manager.execute_sequence(name)
         
         # Закрываем окно команд после выполнения

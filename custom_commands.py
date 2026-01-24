@@ -5,6 +5,7 @@ import time
 import pyautogui
 import webbrowser
 import subprocess
+import platform
 from cursor_simple import SimpleCursor
 
 class CustomCommandsManager:
@@ -67,7 +68,7 @@ class CustomCommandsManager:
         return True
     
     def execute_command(self, command_name):
-        """Выполнить кастомную команду"""
+        """Выполнить кастомную команду - УЛУЧШЕННАЯ ВЕРСИЯ"""
         command_name = command_name.lower()
         
         if command_name not in self.commands:
@@ -75,14 +76,90 @@ class CustomCommandsManager:
         
         command = self.commands[command_name]
         
+        
         try:
             if command['type'] == 'open_url':
                 webbrowser.open(command['params']['url'])
                 return True, f"Открываю {command['params']['url']}"
             
             elif command['type'] == 'run_program':
-                subprocess.Popen(command['params']['path'])
-                return True, f"Запускаю {command['params']['path']}"
+                path = command['params']['path']
+                
+                # Убираем лишние кавычки если они есть
+                path = path.strip('"\'')
+                
+                # Проверяем существует ли файл
+                if not os.path.exists(path):
+                    return False, f"Файл не найден: {path}"
+                
+                # Определяем тип файла по расширению
+                _, extension = os.path.splitext(path.lower())
+                
+                # Если это исполняемый файл или скрипт
+                if extension in ['.exe', '.bat', '.cmd', '.ps1', '.msi']:
+                    subprocess.Popen(path)
+                    return True, f"Запускаю программу: {path}"
+                
+                # Если это медиафайл (mp4, mp3, avi и т.д.)
+                elif extension in ['.mp4', '.mp3', '.avi', '.mkv', '.mov', '.wav', '.flac', '.wma', '.aac']:
+                    # Открываем через ассоциированную программу
+                    if platform.system() == "Windows":
+                        os.startfile(path)
+                    else:
+                        # Для Linux/Mac используем xdg-open или open
+                        try:
+                            if platform.system() == "Darwin":  # Mac
+                                subprocess.Popen(['open', path])
+                            else:  # Linux
+                                subprocess.Popen(['xdg-open', path])
+                        except:
+                            webbrowser.open(path)
+                    return True, f"Открываю медиафайл: {path}"
+                
+                # Если это документ (pdf, docx, txt и т.д.)
+                elif extension in ['.pdf', '.doc', '.docx', '.txt', '.rtf', '.odt']:
+                    if platform.system() == "Windows":
+                        os.startfile(path)
+                    else:
+                        try:
+                            if platform.system() == "Darwin":
+                                subprocess.Popen(['open', path])
+                            else:
+                                subprocess.Popen(['xdg-open', path])
+                        except:
+                            webbrowser.open(path)
+                    return True, f"Открываю документ: {path}"
+                
+                # Если это изображение (jpg, png, gif и т.д.)
+                elif extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp']:
+                    if platform.system() == "Windows":
+                        os.startfile(path)
+                    else:
+                        try:
+                            if platform.system() == "Darwin":
+                                subprocess.Popen(['open', path])
+                            else:
+                                subprocess.Popen(['xdg-open', path])
+                        except:
+                            webbrowser.open(path)
+                    return True, f"Открываю изображение: {path}"
+                
+                # Для всех остальных типов файлов пробуем открыть через системную ассоциацию
+                else:
+                    if platform.system() == "Windows":
+                        os.startfile(path)
+                        return True, f"Открываю файл: {path}"
+                    else:
+                        try:
+                            if platform.system() == "Darwin":
+                                subprocess.Popen(['open', path])
+                            else:
+                                subprocess.Popen(['xdg-open', path])
+                            return True, f"Открываю файл: {path}"
+                        except:
+                            # Последняя попытка - через веб-браузер
+                            webbrowser.open(path)
+                            return True, f"Открываю файл в браузере: {path}"
             
             elif command['type'] == 'press_keys':
                 keys = command['params']['keys']

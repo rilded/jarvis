@@ -323,6 +323,28 @@ class VoiceInput:
             return
         
         input("\nНажмите Enter для продолжения...")
+
+    def check_current_voice(self):
+        """Проверить текущий установленный голос"""
+        if not self.tts_engine:
+            print("TTS движок не инициализирован")
+            return None
+        
+        try:
+            current_voice_id = self.tts_engine.getProperty('voice')
+            voices = self.tts_engine.getProperty('voices')
+            
+            for voice in voices:
+                if voice.id == current_voice_id:
+                    print(f"Текущий голос: {voice.name} (ID: {voice.id})")
+                    return voice.name
+            
+            print("Не удалось определить текущий голос")
+            return None
+            
+        except Exception as e:
+            print(f"Ошибка проверки голоса: {e}")
+            return None
     
     def _init_tts(self):
         """Улучшенная инициализация TTS с приоритетом голоса Vitaliy"""
@@ -338,48 +360,48 @@ class VoiceInput:
             
             self.tts_engine = pyttsx3.init()
             
+            # Подробный поиск голосов
             voices = self.tts_engine.getProperty('voices')
+            print(f"Найдено голосов: {len(voices)}")
             
-            # Приоритетный поиск голосов
-            voice_priority = [
-                # 1. Голос Vitaliy
-                lambda v: 'Vitaliy' in v.name,
-                # 2. Русские голоса
-                lambda v: any(keyword in v.name.lower() or keyword in v.id.lower() 
-                            for keyword in ['russian', 'ru', 'russ', 'rur']),
-                # 3. Любой доступный голос
-                lambda v: True
-            ]
-            
-            selected_voice = None
-            for priority_func in voice_priority:
-                for voice in voices:
-                    if priority_func(voice):
-                        selected_voice = voice
-                        print(f"Найден голос по приоритету {voice_priority.index(priority_func) + 1}: {voice.name}")
-                        break
-                if selected_voice:
+            # Приоритетный поиск голоса Vitaliy
+            vitaliy_found = False
+            for i, voice in enumerate(voices):
+                voice_info = f"Голос {i}: {voice.name} (ID: {voice.id})"
+                print(voice_info)
+                
+                if 'Vitaliy' in voice.name or 'Vitaliy' in voice.id:
+                    self.tts_engine.setProperty('voice', voice.id)
+                    print(f"✓ Установлен голос Vitaliy: {voice.name}")
+                    vitaliy_found = True
                     break
             
-            if selected_voice:
-                self.tts_engine.setProperty('voice', selected_voice.id)
-                print(f"Установлен голос: {selected_voice.name}")
-            else:
-                print("Нет доступных голосов")
-                self.tts_engine = None
-                return
+            if not vitaliy_found:
+                # Поиск русских голосов
+                for voice in voices:
+                    if any(keyword in voice.name.lower() or keyword in voice.id.lower() 
+                        for keyword in ['russian', 'ru', 'russ', 'rur']):
+                        self.tts_engine.setProperty('voice', voice.id)
+                        print(f"✓ Установлен русский голос: {voice.name}")
+                        vitaliy_found = True
+                        break
             
-            # Настройки для русского языка
+            if not vitaliy_found and voices:
+                # Используем первый доступный голос
+                self.tts_engine.setProperty('voice', voices[0].id)
+                print(f"✓ Установлен первый доступный голос: {voices[0].name}")
+            
+            # Стандартные настройки
             self.tts_engine.setProperty('rate', 160)
             self.tts_engine.setProperty('volume', 0.9)
             
-            print("Основной TTS движок инициализирован")
+            print("✓ Основной TTS движок инициализирован")
             
         except ImportError:
-            print("pyttsx3 не установлен. Установите: pip install pyttsx3")
+            print("✗ pyttsx3 не установлен. Установите: pip install pyttsx3")
             self.tts_engine = None
         except Exception as e:
-            print(f"Ошибка инициализации TTS: {e}")
+            print(f"✗ Ошибка инициализации TTS: {e}")
             self.tts_engine = None
     
     def _start_speech_thread(self):
@@ -540,23 +562,20 @@ class VoiceInput:
         self.sound_manager.play_startup_sound()
     
     def speak(self, text, force=False):
-        """Произнести текст - РАЗДЕЛЕННАЯ ЛОГИКА ДЛЯ РЕЖИМА LLM"""
+        """Произнести текст с улучшенным управлением параллелизмом"""
         if not text:
             return
         
-        # Если мы в режиме LLM и флаг установлен - используем только TTS
-        if self.is_llm_mode and self.llm_tts_only:
-            self.speak_llm_response(text)
-            return
-        
-        # Оригинальная логика для обычного режима
+        # Проверяем, не идет ли уже речь (если не принудительно)
         if self.is_speaking and not force:
+            print("Предупреждение: Попытка параллельной озвучки (игнорируем)")
             return
         
+        # Устанавливаем флаг активности
         self.is_speaking = True
         
         try:
-            # Маппинг текста на звуки (только для обычного режима)
+            # ОСНОВНАЯ ЛОГИКА ОЗВУЧКИ
             sound_mapping = {
                 # Приветствия
                 "слушаю": "listening",
@@ -620,42 +639,122 @@ class VoiceInput:
             else:
                 # Если не нашли соответствия, используем случайное подтверждение
                 self.sound_manager.play_acknowledgment()
-            
+                
         except Exception as e:
             print(f"Ошибка озвучки: {e}")
         finally:
+            # Сбрасываем флаг после завершения
             self.is_speaking = False
-    
-    def speak_joke(self, joke_text):
-        """Озвучить шутку специальным методом"""
-        if not joke_text or not self.joke_voice_enabled:
-            return
+
+    def speak_direct(self, text):
+        """Прямая озвучка через основной TTS движок с голосом Vitaliy"""
+        if not text:
+            return False
         
-        print(f"[Озвучка шутки]: {joke_text[:50]}...")
-        
-        # Сохраняем текущие настройки голоса
-        if self.tts_engine:
-            old_rate = self.tts_engine.getProperty('rate')
-            old_volume = self.tts_engine.getProperty('volume')
+        try:
+            # Используем основной TTS движок, чтобы сохранить голос Vitaliy
+            if not self.tts_engine:
+                self._init_tts()  # Переинициализируем если нужно
             
-            try:
-                # Устанавливаем настройки для шуток
-                self.tts_engine.setProperty('rate', self.joke_voice_rate)
+            if self.tts_engine:
+                # Сохраняем текущие настройки
+                old_rate = self.tts_engine.getProperty('rate')
+                old_volume = self.tts_engine.getProperty('volume')
                 
-                # Озвучиваем
-                with self.tts_lock:
-                    self.tts_engine.say(joke_text)
-                    self.tts_engine.runAndWait()
+                # Устанавливаем оптимальные настройки для русского текста
+                self.tts_engine.setProperty('rate', 160)
+                self.tts_engine.setProperty('volume', 1.0)
+                
+                # Разбиваем длинный текст на предложения
+                import re
+                sentences = re.split(r'(?<=[.!?]) +', text)
+                
+                # Озвучиваем каждое предложение
+                for sentence in sentences:
+                    if sentence.strip():
+                        self.tts_engine.say(sentence.strip())
+                
+                self.tts_engine.runAndWait()
                 
                 # Восстанавливаем настройки
                 self.tts_engine.setProperty('rate', old_rate)
                 self.tts_engine.setProperty('volume', old_volume)
+                return True
+            else:
+                print("TTS движок не доступен для прямой озвучки")
+                return False
                 
-            except Exception as e:
-                print(f"Ошибка озвучки шутки: {e}")
-                # Пробуем обычным способом
-                self.speak(joke_text, force=True)
+        except Exception as e:
+            print(f"[DIRECT ОЗВУЧКА] Ошибка: {e}")
+            
+            # Резервный способ через системные команды
+            try:
+                import subprocess
+                safe_text = text.replace('"', "'").replace('`', "'")
+                cmd = f'powershell -Command "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak(\'{safe_text}\')"'
+                subprocess.run(cmd, shell=True, timeout=60, capture_output=True)
+                print("Резервная озвучка через PowerShell завершена")
+                return True
+            except Exception as e2:
+                print(f"[DIRECT ОЗВУЧКА] Ошибка PowerShell: {e2}")
+                
+            return False
     
+    def speak_joke(self, joke_text):
+        """Озвучить шутку с использованием голоса Vitaliy"""
+        if not joke_text or not self.joke_voice_enabled:
+            return
+        
+        # Блокируем возможность параллельной озвучки
+        if self.is_speaking:
+            print("Предупреждение: Другая речь активна, ждем...")
+            # Ждем завершения текущей речи
+            import time
+            start_time = time.time()
+            while self.is_speaking and (time.time() - start_time) < 5:  # Макс 5 секунд ожидания
+                time.sleep(0.1)
+        
+        if self.is_speaking:
+            print("Не удалось дождаться освобождения TTS, пропускаем шутку")
+            return
+        
+        try:
+            self.is_speaking = True
+            
+            # Используем основной метод озвучки, но с измененными настройками для шуток
+            if self.tts_engine:
+                # Сохраняем текущие настройки
+                old_rate = self.tts_engine.getProperty('rate')
+                
+                # Устанавливаем специальную скорость для шуток
+                self.tts_engine.setProperty('rate', self.joke_voice_rate)
+                
+                # Разбиваем шутку на части если нужно
+                import re
+                if len(joke_text) > 100:
+                    sentences = re.split(r'(?<=[.!?]) +', joke_text)
+                    for sentence in sentences:
+                        if sentence.strip():
+                            self.tts_engine.say(sentence.strip())
+                else:
+                    self.tts_engine.say(joke_text)
+                
+                self.tts_engine.runAndWait()
+                
+                # Восстанавливаем настройки
+                self.tts_engine.setProperty('rate', old_rate)
+            else:
+                # Запасной вариант
+                self.speak_direct(joke_text)
+                
+        except Exception as e:
+            print(f"Ошибка озвучки шутки: {e}")
+            # Последняя попытка
+            self.speak_direct(joke_text)
+        
+        finally:
+            self.is_speaking = False
+
     def _play_with_pygame(self, audio_file):
         """Воспроизвести аудио через pygame"""
         try:
@@ -2174,8 +2273,8 @@ class VoiceInput:
         print(f"   {joke}")
         print("\nНадеюсь, вам понравилось!")
         
-        # ПРОСТО ИСПОЛЬЗУЕМ ОБЫЧНУЮ ОЗВУЧКУ
-        self.speak(joke, force=True)
+        # ОЗВУЧКА ШУТКИ - ИСПРАВЛЕННАЯ ВЕРСИЯ
+        self.speak_joke(joke)
         
         return True
     
@@ -2196,9 +2295,90 @@ class VoiceInput:
         
         print(f"\nСейчас {time_str}")
         self.speak(time_speech, force=True)
+
+    def speak_with_tts(self, text, use_vitaliy=True):
+        """Озвучить текст через TTS с голосом Vitaliy (обходит звуковые файлы)"""
+        if not text:
+            return False
+        
+        # Принудительно устанавливаем флаг занятости
+        self.is_speaking = True
+        
+        try:
+            # Переинициализируем TTS если нужно
+            if not self.tts_engine:
+                self._init_tts()
+            
+            if not self.tts_engine:
+                print("TTS движок не доступен")
+                return False
+            
+            # Находим лучший голос
+            voices = self.tts_engine.getProperty('voices')
+            best_voice = None
+            
+            if use_vitaliy:
+                # Ищем Vitaliy в первую очередь
+                for voice in voices:
+                    if 'Vitaliy' in voice.name or 'Vitaliy' in voice.id:
+                        best_voice = voice
+                        break
+            
+            # Если Vitaliy не найден, ищем русские голоса
+            if not best_voice:
+                for voice in voices:
+                    voice_lower = voice.name.lower()
+                    if any(keyword in voice_lower for keyword in ['russian', 'ru', 'russ', 'rur']):
+                        best_voice = voice
+                        print(f"✓ Найден русский голос: {voice.name}")
+                        break
+            
+            # Если ничего не найдено, берем первый доступный
+            if not best_voice and voices:
+                best_voice = voices[0]
+                print(f"✓ Использую первый доступный голос: {voices[0].name}")
+            
+            if best_voice:
+                self.tts_engine.setProperty('voice', best_voice.id)
+            
+            # Устанавливаем хорошие настройки для речи
+            self.tts_engine.setProperty('rate', 160)
+            self.tts_engine.setProperty('volume', 1.0)
+            
+            # Разбиваем длинный текст на предложения
+            import re
+            sentences = re.split(r'(?<=[.!?]) +', text)
+            time.sleep(1.2)
+            # Озвучиваем каждое предложение
+            for sentence in sentences:
+                if sentence.strip():
+                    self.tts_engine.say(sentence.strip())
+            
+            self.tts_engine.runAndWait()
+            return True
+            
+        except Exception as e:
+            print(f"✗ Ошибка TTS озвучки: {e}")
+            
+            # Резервный метод через PowerShell
+            try:
+                import subprocess
+                safe_text = text.replace('"', "'")
+                cmd = f'powershell -Command "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak(\'{safe_text}\')"'
+                subprocess.run(cmd, shell=True, timeout=30)
+                print("✓ Резервная озвучка через PowerShell завершена")
+                return True
+            except Exception as e2:
+                print(f"✗ Ошибка PowerShell: {e2}")
+                
+            return False
+        
+        finally:
+            self.is_speaking = False
+
     
     def tell_date(self):
-        """Сказать текущую дату"""
+        """Сказать текущую дату - ПРИНУДИТЕЛЬНАЯ TTS ОЗВУЧКА"""
         now = datetime.datetime.now()
         
         months = {
@@ -2214,21 +2394,59 @@ class VoiceInput:
         
         weekdays = {
             "Monday": "понедельник",
-            "Tuesday": "вторник",
+            "Tuesday": "вторник", 
             "Wednesday": "среда",
             "Thursday": "четверг",
             "Friday": "пятница",
             "Saturday": "суббота",
-            "Sunday": "воскресенье"
+            "Sunday": "воскресеньe"
         }
         
         weekday_ru = weekdays.get(weekday, weekday)
         
-        date_speech = f"Сегодня {day} {month} {year} года, {weekday_ru}"
+        # Формируем разные варианты для озвучки
+        date_variants = [
+            f"Сегодня {day} {month} {year} года",
+            f"{weekday_ru}",
+            f"Сегодня {weekday_ru}, {day} {month} {year} года"
+        ]
         
-        print(f"\n{date_speech}")
-        self.speak(date_speech, force=True)
-    
+        # Выбираем самый подходящий вариант (не слишком длинный)
+        date_speech = date_variants[0]  # Основной вариант
+        
+        print(f"\nДАТА: {date_speech}")
+        
+        # ПРИНУДИТЕЛЬНАЯ ОЗВУЧКА ЧЕРЕЗ TTS (обход звуковых файлов)
+        success = self.speak_with_tts(date_speech, use_vitaliy=True)
+        
+        if not success:
+            print("Не удалось озвучить дату через TTS")
+        
+        return success
+
+    def stop_all_speech(self):
+        """Принудительно остановить всю озвучку"""
+        try:
+            self.is_speaking = False
+            
+            # Останавливаем TTS движок если он активен
+            if hasattr(self, 'tts_engine') and self.tts_engine:
+                try:
+                    self.tts_engine.stop()
+                except:
+                    pass
+            
+            # Очищаем очередь речи
+            try:
+                while not self.speech_queue.empty():
+                    self.speech_queue.get_nowait()
+            except:
+                pass
+                
+            print("Вся озвучка остановлена")
+        except Exception as e:
+            print(f"Ошибка при остановке озвучки: {e}")
+
     def get_command(self):
         """Получить команду"""
         print("\n" + "="*50)
@@ -2507,15 +2725,7 @@ class VoiceInput:
             return ("print_text", ["[запросить_текст]"])
         
         commands = {
-            "порно": ("open_porn", []),
-            "давай отдохнём": ("open_porn", []),
-            "я устал": ("open_porn", []),
-            "секс": ("open_porn", []),
-            "мужики": ("open_porn", []),
-            "тяжело": ("open_porn", []),
-            "сегодня был тяжёлый день": ("open_porn", []),
-
-            "проверка на вирусы": ("virustotal", []),
+                        "проверка на вирусы": ("virustotal", []),
             "вирустатал": ("virustotal", []),
             "открой вирустатал": ("virustotal", []),
             "открой проверку на вирусы": ("virustotal", []),
@@ -3420,8 +3630,6 @@ class VoiceInput:
             "открой жесткие диски": ("explorer", []),
             "запусти жесткие диски": ("explorer", []),
             "включи жесткие диски": ("explorer", []),
-            
-            # ================== СПИСОК ИКОНОК ==================
         }
         
         if text.startswith("проверь ссылку "):

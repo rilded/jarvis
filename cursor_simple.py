@@ -215,7 +215,7 @@ class SimpleCursor:
         try:
             import datetime
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"screenshot_{timestamp}.png"
+            filename = f"screenshot\screenshot_{timestamp}.png"
             
             screenshot = pyautogui.screenshot()
             screenshot.save(filename)
