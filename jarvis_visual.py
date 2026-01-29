@@ -16,6 +16,7 @@ from commands_interface import CommandsInterface
 from custom_commands import CustomCommandsManager
 from commands_interface import CommandEntry
 from commands_interface import UniversalCommandEntry
+from jarvis_sound_manager import JarvisSoundManager
 
 # Добавляем текущую папку в путь
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -30,6 +31,7 @@ class SettingsManager:
     def load_settings(self):
         """Загрузить настройки из файла"""
         default_settings = {
+            
             "recognition": {
                 "engine": "vosk",
                 "vosk_model": "vosk-model-small-ru-0.22",
@@ -42,6 +44,9 @@ class SettingsManager:
                 "tts_rate": 180,
                 "tts_volume": 0.9,
                 "prefer_cached_sounds": True
+            },
+            "voice_pack": {
+                "current_voice": "original"
             },
             "interface": {
                 "color_scheme": "default",
@@ -88,12 +93,16 @@ class SettingsManager:
     
     def merge_settings(self, default, loaded):
         """Объединить настройки"""
-        for category in default:
-            if category in loaded:
-                for key in default[category]:
-                    if key in loaded[category]:
-                        default[category][key] = loaded[category][key]
-        return default
+        result = default.copy()
+        for category in loaded:
+            if category in result:
+                if isinstance(result[category], dict) and isinstance(loaded[category], dict):
+                    result[category].update(loaded[category])
+                else:
+                    result[category] = loaded[category]
+            else:
+                result[category] = loaded[category]
+        return result
     
     def save_settings(self):
         """Сохранить настройки в файл"""
@@ -367,11 +376,12 @@ class JarvisVisual:
     """Визуальный интерфейс Джарвис"""
     
     def __init__(self):
-        # Менеджер настроек
+    # Менеджер настроек
         self.settings_manager = SettingsManager()
         self.settings = self.settings_manager.settings
         from jarvis_sound_manager import JarvisSoundManager
-        self.sound_manager = JarvisSoundManager()
+        # ИСПРАВЛЕНО: передаем текущий голос из настроек
+        self.sound_manager = JarvisSoundManager(voice_pack=self.settings['voice_pack']['current_voice'])
         self.commands_manager = CustomCommandsManager()
         
         
@@ -507,6 +517,16 @@ class JarvisVisual:
         self.root.after(1000, self.play_startup_sound)
         self.commands_interface = CommandsInterface(self.root, self.colors, self.commands_manager)
 
+    def debug_voice_settings(self):
+        """Отладка голосовых настроек"""
+        print("=" * 50)
+        print("ОТЛАДКА ГОЛОСОВЫХ НАСТРОЕК")
+        print(f"Текущий голос в настройках: {self.settings['voice_pack']['current_voice']}")
+        print(f"Текущий голос в sound_manager: {self.sound_manager.voice_pack}")
+        print(f"Папка звуков: {self.sound_manager.sounds_dir}")
+        print(f"Загруженные звуки: {list(self.sound_manager.sounds.keys())}")
+        print("=" * 50)
+
     def play_command_sound(self, command_type):
         """Воспроизвести звук для команды"""
         sound_mapping = {
@@ -612,7 +632,37 @@ class JarvisVisual:
         # Настройки LLM
         if hasattr(self.voice, 'is_llm_mode'):
             self.voice.is_llm_mode = self.settings['llm']['enabled']
+        if hasattr(self.voice, 'set_voice_pack'):
+            current_voice = self.settings['voice_pack']['current_voice']
+            self.voice.set_voice_pack(current_voice)
     
+    def test_voice_pack(self, settings_vars):
+        """Протестировать текущий голосовой пакет"""
+        try:
+            # ИСПРАВЛЕНО: правильный ключ
+            voice_pack = settings_vars['voice_pack'].get()
+            self.add_status_message(f"Тестирую голос: {voice_pack}", "SYSTEM")
+            
+            # Тестируем разные типы звуков
+            test_sounds = [
+                ("Приветствие", "startup"),
+                ("Подтверждение", "acknowledgment"), 
+                ("Завершение", "completion")
+            ]
+            
+            def play_test_sounds():
+                # Создаем временный менеджер звука для теста
+                test_sound_manager = JarvisSoundManager(voice_pack=voice_pack)
+                time.sleep(1)
+                for name, category in test_sounds:
+                    self.add_status_message(f"Воспроизводится: {name}", "SYSTEM")
+                    test_sound_manager.play_random_sound(category)
+                    time.sleep(2)
+            
+            threading.Thread(target=play_test_sounds, daemon=True).start()
+        except Exception as e:
+            self.add_status_message(f"Ошибка тестирования голоса: {str(e)}", "ERROR")
+
     def setup_voice_monitoring(self):
         """Настроить мониторинг голосового модуля"""
         self.original_speak = getattr(self.voice, 'speak', None)
@@ -1433,24 +1483,24 @@ class JarvisVisual:
         engine_frame.pack(fill=tk.X, padx=20, pady=5)
         
         tk.Radiobutton(engine_frame,
-                      text="VOSK (офлайн)",
-                      font=('Courier', 10),
-                      variable=engine_var,
-                      value="vosk",
-                      fg=self.colors['text'],
-                      bg=self.colors['bg'],
-                      selectcolor=self.colors['bg'],
-                      activebackground=self.colors['bg']).pack(anchor=tk.W, side=tk.LEFT, padx=10)
+                    text="VOSK (офлайн)",
+                    font=('Courier', 10),
+                    variable=engine_var,
+                    value="vosk",
+                    fg=self.colors['text'],
+                    bg=self.colors['bg'],
+                    selectcolor=self.colors['bg'],
+                    activebackground=self.colors['bg']).pack(anchor=tk.W, side=tk.LEFT, padx=10)
         
         tk.Radiobutton(engine_frame,
-                      text="Google (онлайн)",
-                      font=('Courier', 10),
-                      variable=engine_var,
-                      value="google",
-                      fg=self.colors['text'],
-                      bg=self.colors['bg'],
-                      selectcolor=self.colors['bg'],
-                      activebackground=self.colors['bg']).pack(anchor=tk.W, side=tk.LEFT, padx=10)
+                    text="Google (онлайн)",
+                    font=('Courier', 10),
+                    variable=engine_var,
+                    value="google",
+                    fg=self.colors['text'],
+                    bg=self.colors['bg'],
+                    selectcolor=self.colors['bg'],
+                    activebackground=self.colors['bg']).pack(anchor=tk.W, side=tk.LEFT, padx=10)
         
         # Модель VOSK
         tk.Label(recog_frame,
@@ -1466,24 +1516,24 @@ class JarvisVisual:
         vosk_frame.pack(fill=tk.X, padx=20, pady=5)
         
         tk.Radiobutton(vosk_frame,
-                      text="small-ru-0.22 (быстрая, 40MB)",
-                      font=('Courier', 10),
-                      variable=vosk_model_var,
-                      value="vosk-model-small-ru-0.22",
-                      fg=self.colors['text'],
-                      bg=self.colors['bg'],
-                      selectcolor=self.colors['bg'],
-                      activebackground=self.colors['bg']).pack(anchor=tk.W)
+                    text="small-ru-0.22 (быстрая, 40MB)",
+                    font=('Courier', 10),
+                    variable=vosk_model_var,
+                    value="vosk-model-small-ru-0.22",
+                    fg=self.colors['text'],
+                    bg=self.colors['bg'],
+                    selectcolor=self.colors['bg'],
+                    activebackground=self.colors['bg']).pack(anchor=tk.W)
         
         tk.Radiobutton(vosk_frame,
-                      text="ru-0.42 (точная, 1.8GB)",
-                      font=('Courier', 10),
-                      variable=vosk_model_var,
-                      value="vosk-model-ru-0.42",
-                      fg=self.colors['text'],
-                      bg=self.colors['bg'],
-                      selectcolor=self.colors['bg'],
-                      activebackground=self.colors['bg']).pack(anchor=tk.W)
+                    text="ru-0.42 (точная, 1.8GB)",
+                    font=('Courier', 10),
+                    variable=vosk_model_var,
+                    value="vosk-model-ru-0.42",
+                    fg=self.colors['text'],
+                    bg=self.colors['bg'],
+                    selectcolor=self.colors['bg'],
+                    activebackground=self.colors['bg']).pack(anchor=tk.W)
         
         # Фраза активации
         tk.Label(recog_frame,
@@ -1493,10 +1543,10 @@ class JarvisVisual:
                 bg=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=(20, 5))
         
         activation_entry = tk.Entry(recog_frame,
-                                  font=('Courier', 10),
-                                  bg='#222222',
-                                  fg=self.colors['text'],
-                                  insertbackground=self.colors['text'])
+                                font=('Courier', 10),
+                                bg='#222222',
+                                fg=self.colors['text'],
+                                insertbackground=self.colors['text'])
         activation_entry.pack(padx=20, pady=5, fill=tk.X)
         activation_entry.insert(0, self.settings['recognition']['activation_phrase'])
         settings_vars['activation_phrase'] = activation_entry
@@ -1512,11 +1562,11 @@ class JarvisVisual:
                 bg=self.colors['bg']).pack(side=tk.LEFT, padx=(0, 10))
         
         timeout_spin = tk.Spinbox(timeout_frame,
-                                 from_=1, to=30,
-                                 font=('Courier', 10),
-                                 bg='#222222',
-                                 fg=self.colors['text'],
-                                 width=8)
+                                from_=1, to=30,
+                                font=('Courier', 10),
+                                bg='#222222',
+                                fg=self.colors['text'],
+                                width=8)
         timeout_spin.pack(side=tk.LEFT)
         timeout_spin.delete(0, tk.END)
         timeout_spin.insert(0, str(self.settings['recognition']['listen_timeout']))
@@ -1525,70 +1575,113 @@ class JarvisVisual:
         # Вкладка 2: Голос и звук
         voice_frame = tk.Frame(notebook, bg=self.colors['bg'])
         notebook.add(voice_frame, text="Голос и звук")
-        
+
+        # Выбор голосового пакета
+        tk.Label(voice_frame,
+                text="Голосовой пакет:",
+                font=('Courier', 11),
+                fg=self.colors['text'],
+                bg=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=(20, 5))
+
+        voice_var = tk.StringVar(value=self.settings['voice_pack']['current_voice'])
+        settings_vars['voice_pack'] = voice_var
+
+        voices_frame = tk.Frame(voice_frame, bg=self.colors['bg'])
+        voices_frame.pack(fill=tk.X, padx=20, pady=5)
+
+        voices = [
+            ("Оригинал (jarvis_sounds_original)", "original"),
+            ("Хауди (jarvis_sounds_haudi)", "haudi"), 
+            ("Ремастер (jarvis_sounds_remaster)", "remaster")
+        ]
+
+        for text, value in voices:
+            tk.Radiobutton(voices_frame,
+                        text=text,
+                        font=('Courier', 10),
+                        variable=voice_var,
+                        value=value,
+                        fg=self.colors['text'],
+                        bg=self.colors['bg'],
+                        selectcolor=self.colors['bg'],
+                        activebackground=self.colors['bg']).pack(anchor=tk.W)
+
+        # Кнопка тестирования голоса
+        test_voice_btn = tk.Button(voice_frame,
+                                text="Протестировать голос",
+                                font=('Courier', 10),
+                                bg='#222222',
+                                fg=self.colors['accent'],
+                                command=lambda: self.test_voice_pack(settings_vars))
+        test_voice_btn.pack(padx=20, pady=10)
+
+        # Разделитель
+        sep = tk.Frame(voice_frame, height=2, bg=self.colors['accent'])
+        sep.pack(fill=tk.X, pady=15)
+
         # Включение TTS
         tts_var = tk.BooleanVar(value=self.settings['voice']['tts_enabled'])
         settings_vars['tts_enabled'] = tts_var
-        
+
         tk.Checkbutton(voice_frame,
-                      text="Включить озвучку ответов (TTS)",
-                      font=('Courier', 10),
-                      variable=tts_var,
-                      fg=self.colors['text'],
-                      bg=self.colors['bg'],
-                      selectcolor=self.colors['bg'],
-                      activebackground=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=(20, 5))
-        
+                    text="Включить озвучку ответов (TTS)",
+                    font=('Courier', 10),
+                    variable=tts_var,
+                    fg=self.colors['text'],
+                    bg=self.colors['bg'],
+                    selectcolor=self.colors['bg'],
+                    activebackground=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=(20, 5))
+
         # Настройки TTS
         tts_settings_frame = tk.Frame(voice_frame, bg=self.colors['bg'])
         tts_settings_frame.pack(fill=tk.X, padx=20, pady=10)
-        
+
         tk.Label(tts_settings_frame,
                 text="Скорость речи:",
                 font=('Courier', 10),
                 fg=self.colors['text'],
                 bg=self.colors['bg']).pack(side=tk.LEFT, padx=(0, 10))
-        
+
         tts_rate_scale = tk.Scale(tts_settings_frame,
-                                 from_=50, to=300,
-                                 orient=tk.HORIZONTAL,
-                                 length=200,
-                                 bg=self.colors['bg'],
-                                 fg=self.colors['text'],
-                                 highlightbackground=self.colors['bg'])
+                                from_=50, to=300,
+                                orient=tk.HORIZONTAL,
+                                length=200,
+                                bg=self.colors['bg'],
+                                fg=self.colors['text'],
+                                highlightbackground=self.colors['bg'])
         tts_rate_scale.pack(side=tk.LEFT)
         tts_rate_scale.set(self.settings['voice']['tts_rate'])
         settings_vars['tts_rate'] = tts_rate_scale
-        
+
         tk.Label(tts_settings_frame,
                 text="Громкость:",
                 font=('Courier', 10),
                 fg=self.colors['text'],
                 bg=self.colors['bg']).pack(side=tk.LEFT, padx=(20, 10))
-        
+
         tts_volume_scale = tk.Scale(tts_settings_frame,
-                                   from_=0, to=100,
-                                   orient=tk.HORIZONTAL,
-                                   length=200,
-                                   bg=self.colors['bg'],
-                                   fg=self.colors['text'],
-                                   highlightbackground=self.colors['bg'])
+                                from_=0, to=100,
+                                orient=tk.HORIZONTAL,
+                                length=200,
+                                bg=self.colors['bg'],
+                                fg=self.colors['text'],
+                                highlightbackground=self.colors['bg'])
         tts_volume_scale.pack(side=tk.LEFT)
         tts_volume_scale.set(int(self.settings['voice']['tts_volume'] * 100))
         settings_vars['tts_volume'] = tts_volume_scale
-        
+
         # Кэшированные звуки
         cached_var = tk.BooleanVar(value=self.settings['voice']['prefer_cached_sounds'])
         settings_vars['prefer_cached_sounds'] = cached_var
-        
+
         tk.Checkbutton(voice_frame,
-                      text="Предпочитать кэшированные звуки",
-                      font=('Courier', 10),
-                      variable=cached_var,
-                      fg=self.colors['text'],
-                      bg=self.colors['bg'],
-                      selectcolor=self.colors['bg'],
-                      activebackground=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=10)
+                    text="Предпочитать кэшированные звуки",
+                    font=('Courier', 10),
+                    variable=cached_var,
+                    fg=self.colors['text'],
+                    bg=self.colors['bg'],
+                    selectcolor=self.colors['bg'],
+                    activebackground=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=10)
         
         # Вкладка 3: Интерфейс
         interface_frame = tk.Frame(notebook, bg=self.colors['bg'])
@@ -1617,14 +1710,14 @@ class JarvisVisual:
         
         for color_name, color_value in colors:
             tk.Radiobutton(colors_frame,
-                          text=color_name,
-                          font=('Courier', 10),
-                          variable=color_var,
-                          value=color_value,
-                          fg=self.colors['text'],
-                          bg=self.colors['bg'],
-                          selectcolor=self.colors['bg'],
-                          activebackground=self.colors['bg']).pack(anchor=tk.W)
+                        text=color_name,
+                        font=('Courier', 10),
+                        variable=color_var,
+                        value=color_value,
+                        fg=self.colors['text'],
+                        bg=self.colors['bg'],
+                        selectcolor=self.colors['bg'],
+                        activebackground=self.colors['bg']).pack(anchor=tk.W)
         
         # Масштаб реактора
         tk.Label(interface_frame,
@@ -1658,39 +1751,39 @@ class JarvisVisual:
         settings_vars['always_on_top'] = always_top_var
         
         tk.Checkbutton(interface_settings_frame,
-                      text="Окно поверх других окон",
-                      font=('Courier', 10),
-                      variable=always_top_var,
-                      fg=self.colors['text'],
-                      bg=self.colors['bg'],
-                      selectcolor=self.colors['bg'],
-                      activebackground=self.colors['bg']).pack(anchor=tk.W, pady=5)
+                    text="Окно поверх других окон",
+                    font=('Courier', 10),
+                    variable=always_top_var,
+                    fg=self.colors['text'],
+                    bg=self.colors['bg'],
+                    selectcolor=self.colors['bg'],
+                    activebackground=self.colors['bg']).pack(anchor=tk.W, pady=5)
         
         # Автостарт голосового режима
         auto_voice_var = tk.BooleanVar(value=self.settings['interface']['auto_start_voice'])
         settings_vars['auto_start_voice'] = auto_voice_var
         
         tk.Checkbutton(interface_settings_frame,
-                      text="Автозапуск голосового режима",
-                      font=('Courier', 10),
-                      variable=auto_voice_var,
-                      fg=self.colors['text'],
-                      bg=self.colors['bg'],
-                      selectcolor=self.colors['bg'],
-                      activebackground=self.colors['bg']).pack(anchor=tk.W, pady=5)
+                    text="Автозапуск голосового режима",
+                    font=('Courier', 10),
+                    variable=auto_voice_var,
+                    fg=self.colors['text'],
+                    bg=self.colors['bg'],
+                    selectcolor=self.colors['bg'],
+                    activebackground=self.colors['bg']).pack(anchor=tk.W, pady=5)
         
         # Показывать время
         show_time_var = tk.BooleanVar(value=self.settings['interface']['show_timestamp'])
         settings_vars['show_timestamp'] = show_time_var
         
         tk.Checkbutton(interface_settings_frame,
-                      text="Показывать время в терминале",
-                      font=('Courier', 10),
-                      variable=show_time_var,
-                      fg=self.colors['text'],
-                      bg=self.colors['bg'],
-                      selectcolor=self.colors['bg'],
-                      activebackground=self.colors['bg']).pack(anchor=tk.W, pady=5)
+                    text="Показывать время в терминале",
+                    font=('Courier', 10),
+                    variable=show_time_var,
+                    fg=self.colors['text'],
+                    bg=self.colors['bg'],
+                    selectcolor=self.colors['bg'],
+                    activebackground=self.colors['bg']).pack(anchor=tk.W, pady=5)
         
         # Максимум строк в журнале
         tk.Label(interface_settings_frame,
@@ -1700,11 +1793,11 @@ class JarvisVisual:
                 bg=self.colors['bg']).pack(side=tk.LEFT, padx=(0, 10), pady=10)
         
         log_lines_spin = tk.Spinbox(interface_settings_frame,
-                                   from_=100, to=2000,
-                                   font=('Courier', 10),
-                                   bg='#222222',
-                                   fg=self.colors['text'],
-                                   width=8)
+                                from_=100, to=2000,
+                                font=('Courier', 10),
+                                bg='#222222',
+                                fg=self.colors['text'],
+                                width=8)
         log_lines_spin.pack(side=tk.LEFT)
         log_lines_spin.delete(0, tk.END)
         log_lines_spin.insert(0, str(self.settings['interface']['log_max_lines']))
@@ -1719,13 +1812,13 @@ class JarvisVisual:
         settings_vars['auto_reactor'] = auto_reactor_var
         
         tk.Checkbutton(reactor_frame,
-                      text="Автоматически активировать реактор при речи",
-                      font=('Courier', 10),
-                      variable=auto_reactor_var,
-                      fg=self.colors['text'],
-                      bg=self.colors['bg'],
-                      selectcolor=self.colors['bg'],
-                      activebackground=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=(20, 5))
+                    text="Автоматически активировать реактор при речи",
+                    font=('Courier', 10),
+                    variable=auto_reactor_var,
+                    fg=self.colors['text'],
+                    bg=self.colors['bg'],
+                    selectcolor=self.colors['bg'],
+                    activebackground=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=(20, 5))
         
         # Скорость реактора
         reactor_speed_frame = tk.Frame(reactor_frame, bg=self.colors['bg'])
@@ -1738,13 +1831,13 @@ class JarvisVisual:
                 bg=self.colors['bg']).pack(side=tk.LEFT, padx=(0, 10))
         
         reactor_speed_scale = tk.Scale(reactor_speed_frame,
-                                      from_=0.5, to=2.0,
-                                      resolution=0.1,
-                                      orient=tk.HORIZONTAL,
-                                      length=200,
-                                      bg=self.colors['bg'],
-                                      fg=self.colors['text'],
-                                      highlightbackground=self.colors['bg'])
+                                    from_=0.5, to=2.0,
+                                    resolution=0.1,
+                                    orient=tk.HORIZONTAL,
+                                    length=200,
+                                    bg=self.colors['bg'],
+                                    fg=self.colors['text'],
+                                    highlightbackground=self.colors['bg'])
         reactor_speed_scale.pack(side=tk.LEFT)
         reactor_speed_scale.set(self.settings['reaction']['reactor_speed'])
         settings_vars['reactor_speed'] = reactor_speed_scale
@@ -1760,12 +1853,12 @@ class JarvisVisual:
                 bg=self.colors['bg']).pack(side=tk.LEFT, padx=(0, 10))
         
         reactor_duration_spin = tk.Spinbox(duration_frame,
-                                          from_=0.5, to=10.0,
-                                          increment=0.5,
-                                          font=('Courier', 10),
-                                          bg='#222222',
-                                          fg=self.colors['text'],
-                                          width=8)
+                                        from_=0.5, to=10.0,
+                                        increment=0.5,
+                                        font=('Courier', 10),
+                                        bg='#222222',
+                                        fg=self.colors['text'],
+                                        width=8)
         reactor_duration_spin.pack(side=tk.LEFT)
         reactor_duration_spin.delete(0, tk.END)
         reactor_duration_spin.insert(0, str(self.settings['reaction']['reactor_duration']))
@@ -1780,13 +1873,13 @@ class JarvisVisual:
         settings_vars['llm_enabled'] = llm_enabled_var
         
         tk.Checkbutton(llm_frame,
-                      text="Включить режим общения с ИИ (Ollama)",
-                      font=('Courier', 10),
-                      variable=llm_enabled_var,
-                      fg=self.colors['text'],
-                      bg=self.colors['bg'],
-                      selectcolor=self.colors['bg'],
-                      activebackground=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=(20, 5))
+                    text="Включить режим общения с ИИ (Ollama)",
+                    font=('Courier', 10),
+                    variable=llm_enabled_var,
+                    fg=self.colors['text'],
+                    bg=self.colors['bg'],
+                    selectcolor=self.colors['bg'],
+                    activebackground=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=(20, 5))
         
         # Путь к Ollama
         tk.Label(llm_frame,
@@ -1796,10 +1889,10 @@ class JarvisVisual:
                 bg=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=(20, 5))
         
         ollama_entry = tk.Entry(llm_frame,
-                               font=('Courier', 10),
-                               bg='#222222',
-                               fg=self.colors['text'],
-                               insertbackground=self.colors['text'])
+                            font=('Courier', 10),
+                            bg='#222222',
+                            fg=self.colors['text'],
+                            insertbackground=self.colors['text'])
         ollama_entry.pack(padx=20, pady=5, fill=tk.X)
         ollama_entry.insert(0, self.settings['llm']['ollama_path'])
         settings_vars['ollama_path'] = ollama_entry
@@ -1812,10 +1905,10 @@ class JarvisVisual:
                 bg=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=(20, 5))
         
         llm_model_entry = tk.Entry(llm_frame,
-                                  font=('Courier', 10),
-                                  bg='#222222',
-                                  fg=self.colors['text'],
-                                  insertbackground=self.colors['text'])
+                                font=('Courier', 10),
+                                bg='#222222',
+                                fg=self.colors['text'],
+                                insertbackground=self.colors['text'])
         llm_model_entry.pack(padx=20, pady=5, fill=tk.X)
         llm_model_entry.insert(0, self.settings['llm']['model'])
         settings_vars['llm_model'] = llm_model_entry
@@ -1828,72 +1921,103 @@ class JarvisVisual:
                 bg=self.colors['bg']).pack(anchor=tk.W, padx=20, pady=(20, 5))
         
         prompt_text = tk.Text(llm_frame,
-                             height=5,
-                             font=('Courier', 10),
-                             bg='#222222',
-                             fg=self.colors['text'],
-                             wrap=tk.WORD)
+                            height=5,
+                            font=('Courier', 10),
+                            bg='#222222',
+                            fg=self.colors['text'],
+                            wrap=tk.WORD)
         prompt_text.pack(padx=20, pady=5, fill=tk.X)
         prompt_text.insert(1.0, self.settings['llm']['system_prompt'])
         settings_vars['system_prompt'] = prompt_text
         
         # Кнопка теста Ollama
         test_ollama_btn = tk.Button(llm_frame,
-                                   text="Проверить подключение к Ollama",
-                                   font=('Courier', 10),
-                                   bg='#222222',
-                                   fg=self.colors['accent'],
-                                   command=lambda: self.test_ollama_connection(ollama_entry.get()))
+                                text="Проверить подключение к Ollama",
+                                font=('Courier', 10),
+                                bg='#222222',
+                                fg=self.colors['accent'],
+                                command=lambda: self.test_ollama_connection(ollama_entry.get()))
         test_ollama_btn.pack(padx=20, pady=10)
         
         # Кнопки внизу окна
         button_frame = tk.Frame(settings_window, bg=self.colors['bg'])
         button_frame.pack(fill=tk.X, padx=20, pady=10)
         
-        def apply_settings():
-            """Применить все настройки"""
+        # ЛОКАЛЬНАЯ ФУНКЦИЯ apply_settings
+        def apply_settings_local():
+            """Применить все настройки - ЛОКАЛЬНАЯ ВЕРСИЯ"""
             try:
-                # Распознавание
-                self.settings['recognition']['engine'] = engine_var.get()
-                self.settings['recognition']['vosk_model'] = vosk_model_var.get()
-                self.settings['recognition']['activation_phrase'] = activation_entry.get().strip() or "джарвис"
-                self.settings['recognition']['listen_timeout'] = float(timeout_spin.get())
+                # Сохраняем текущие значения перед применением
+                old_voice_pack = self.settings['voice_pack']['current_voice']
+                print(f"Старый голос: {old_voice_pack}")
                 
-                # Голос
-                self.settings['voice']['tts_enabled'] = tts_var.get()
-                self.settings['voice']['tts_rate'] = tts_rate_scale.get()
-                self.settings['voice']['tts_volume'] = tts_volume_scale.get() / 100.0
-                self.settings['voice']['prefer_cached_sounds'] = cached_var.get()
+                # Распознавание
+                self.settings['recognition']['engine'] = settings_vars['engine'].get()
+                self.settings['recognition']['vosk_model'] = settings_vars['vosk_model'].get()
+                self.settings['recognition']['activation_phrase'] = settings_vars['activation_phrase'].get().strip() or "джарвис"
+                self.settings['recognition']['listen_timeout'] = float(settings_vars['listen_timeout'].get())
+                
+                # Голос и звук
+                new_voice_pack = settings_vars['voice_pack'].get()
+                print(f"Новый голос: {new_voice_pack}")
+                
+                self.settings['voice_pack']['current_voice'] = new_voice_pack
+                self.settings['voice']['tts_enabled'] = settings_vars['tts_enabled'].get()
+                self.settings['voice']['tts_rate'] = settings_vars['tts_rate'].get()
+                self.settings['voice']['tts_volume'] = settings_vars['tts_volume'].get() / 100.0
+                self.settings['voice']['prefer_cached_sounds'] = settings_vars['prefer_cached_sounds'].get()
                 
                 # Интерфейс
-                self.settings['interface']['color_scheme'] = color_var.get()
-                self.settings['interface']['reactor_scale'] = reactor_scale_var.get()
-                self.settings['interface']['always_on_top'] = always_top_var.get()
-                self.settings['interface']['auto_start_voice'] = auto_voice_var.get()
-                self.settings['interface']['show_timestamp'] = show_time_var.get()
-                self.settings['interface']['log_max_lines'] = int(log_lines_spin.get())
+                self.settings['interface']['color_scheme'] = settings_vars['color_scheme'].get()
+                self.settings['interface']['reactor_scale'] = settings_vars['reactor_scale'].get()
+                self.settings['interface']['always_on_top'] = settings_vars['always_on_top'].get()
+                self.settings['interface']['auto_start_voice'] = settings_vars['auto_start_voice'].get()
+                self.settings['interface']['show_timestamp'] = settings_vars['show_timestamp'].get()
+                self.settings['interface']['log_max_lines'] = int(settings_vars['log_max_lines'].get())
                 
                 # Реактор
-                self.settings['reaction']['auto_reactor'] = auto_reactor_var.get()
-                self.settings['reaction']['reactor_speed'] = reactor_speed_scale.get()
-                self.settings['reaction']['reactor_duration'] = float(reactor_duration_spin.get())
+                self.settings['reaction']['auto_reactor'] = settings_vars['auto_reactor'].get()
+                self.settings['reaction']['reactor_speed'] = settings_vars['reactor_speed'].get()
+                self.settings['reaction']['reactor_duration'] = float(settings_vars['reactor_duration'].get())
                 
                 # LLM
-                self.settings['llm']['enabled'] = llm_enabled_var.get()
-                self.settings['llm']['ollama_path'] = ollama_entry.get().strip()
-                self.settings['llm']['model'] = llm_model_entry.get().strip()
-                self.settings['llm']['system_prompt'] = prompt_text.get(1.0, tk.END).strip()
+                self.settings['llm']['enabled'] = settings_vars['llm_enabled'].get()
+                self.settings['llm']['ollama_path'] = settings_vars['ollama_path'].get().strip()
+                self.settings['llm']['model'] = settings_vars['llm_model'].get().strip()
+                self.settings['llm']['system_prompt'] = settings_vars['system_prompt'].get("1.0", tk.END).strip()
                 
+                # Сохраняем настройки
+                print(f"Сохраняем настройки, голос будет: {new_voice_pack}")
                 if self.settings_manager.save_settings():
+                    print("Настройки сохранены успешно")
+                    
+                    # ПЕРЕКЛЮЧАЕМ ГОЛОС ЕСЛИ ОН ИЗМЕНИЛСЯ
+                    if new_voice_pack != old_voice_pack:
+                        print(f"Переключаем голос: {old_voice_pack} -> {new_voice_pack}")
+                        success = self.sound_manager.set_voice_pack(new_voice_pack)
+                        if hasattr(self.voice, 'set_voice_pack'):
+                            self.voice.set_voice_pack(new_voice_pack)
+                        if success:
+                            self.add_status_message(f"Голос переключен на: {new_voice_pack}", "SYSTEM")
+                            print("Голос переключен успешно")
+                        else:
+                            self.add_status_message(f"Ошибка переключения голоса на: {new_voice_pack}", "ERROR")
+                            print("Ошибка переключения голоса")
+                    else:
+                        print("Голос не изменился")
+                    
+                    # Применяем остальные настройки
                     self.apply_voice_settings(apply_now=True)
                     
-                    new_color_scheme = color_var.get()
-                    if new_color_scheme != self.colors:
+                    # Обновляем цветовую схему
+                    new_color_scheme = settings_vars['color_scheme'].get()
+                    if new_color_scheme != self.settings['interface']['color_scheme']:
                         self.colors = self.color_schemes.get(new_color_scheme, self.color_schemes['default'])
                         self.update_colors()
                     
                     self.update_interface_from_settings()
                     
+                    # Обновляем поведение окна
                     if self.settings['interface']['always_on_top']:
                         self.root.attributes('-topmost', True)
                     else:
@@ -1908,69 +2032,70 @@ class JarvisVisual:
                         self.llm_button.config(text="ИИ ВЫКЛ", fg=self.colors['accent'])
                         self.llm_indicator.config(text="● ИИ: ВЫКЛ", fg='#888888')
                     
-                    self.add_status_message("Настройки успешно сохранены и применены", self.colors['text'])
+                    self.add_status_message("Настройки успешно сохранены и применены", "SYSTEM")
                     settings_window.destroy()
                 else:
-                    self.add_status_message("Ошибка сохранения настроек", self.colors['text'])
+                    self.add_status_message("Ошибка сохранения настроек", "ERROR")
+                    print("Ошибка сохранения настроек")
                     
             except Exception as e:
-                self.add_status_message(f"Ошибка применения настроек: {e}", self.colors['text'])
-        
+                error_msg = str(e)
+                print(f"Ошибка применения настроек: {error_msg}")
+                self.add_status_message(f"Ошибка применения настроек: {error_msg[:100]}", "ERROR")
+                import traceback
+                traceback.print_exc()
+
         def test_voice():
             """Тест голосового распознавания"""
-            self.add_status_message("Запускаю тест распознавания...", self.colors['text'])
-            engine = engine_var.get()
-            model = vosk_model_var.get()
-            self.add_status_message(f"Тестируем {engine.upper()} распознавание", self.colors['text'])
+            self.add_status_message("Запускаю тест распознавания...", "SYSTEM")
+            engine = settings_vars['engine'].get()
+            model = settings_vars['vosk_model'].get()
+            self.add_status_message(f"Тестируем {engine.upper()} распознавание", "SYSTEM")
             if engine == 'vosk':
-                self.add_status_message(f"Модель: {model}", self.colors['text'])
+                self.add_status_message(f"Модель: {model}", "SYSTEM")
             threading.Thread(target=self.voice.test_voice, daemon=True).start()
-        
-        def test_ollama_connection(path):
-            """Тест подключения к Ollama"""
-            self.add_status_message("Проверяю подключение к Ollama...", self.colors['text'])
-            threading.Thread(target=lambda: self._test_ollama(path), daemon=True).start()
         
         def reset_settings():
             """Сбросить настройки к значениям по умолчанию"""
             if messagebox.askyesno("Сброс настроек", 
-                                  "Вы уверены, что хотите сбросить все настройки к значениям по умолчанию?"):
+                                "Вы уверены, что хотите сбросить все настройки к значениям по умолчанию?"):
                 default_settings = SettingsManager().load_settings()
                 self.settings = default_settings
                 self.settings_manager.settings = default_settings
                 self.settings_manager.save_settings()
-                self.add_status_message("Настройки сброшены к значениям по умолчанию", self.colors['text'])
+                self.add_status_message("Настройки сброшены к значениям по умолчанию", "SYSTEM")
                 settings_window.destroy()
                 self.apply_voice_settings(apply_now=True)
                 self.update_interface_from_settings()
         
         tk.Button(button_frame,
-                 text="Применить",
-                 font=('Courier', 10),
-                 bg='#222222',
-                 fg=self.colors['accent'],
-                 command=apply_settings).pack(side=tk.LEFT, padx=5)
+                text="Применить",
+                font=('Courier', 10),
+                bg='#222222',
+                fg=self.colors['accent'],
+                command=apply_settings_local).pack(side=tk.LEFT, padx=5)
         
         tk.Button(button_frame,
-                 text="Тест голоса",
-                 font=('Courier', 10),
-                 bg='#222222',
-                 fg=self.colors['accent'],
-                 command=test_voice).pack(side=tk.LEFT, padx=5)
+                text="Тест голоса",
+                font=('Courier', 10),
+                bg='#222222',
+                fg=self.colors['accent'],
+                command=test_voice).pack(side=tk.LEFT, padx=5)
         
         tk.Button(button_frame,
-                 text="Сбросить",
-                 font=('Courier', 10),
-                 bg='#222222',
-                 fg='#ffaa00',
-                 command=reset_settings).pack(side=tk.LEFT, padx=5)
+                text="Сбросить",
+                font=('Courier', 10),
+                bg='#222222',
+                fg='#ffaa00',
+                command=reset_settings).pack(side=tk.LEFT, padx=5)
         
         tk.Button(button_frame,
-                 text="Отмена",
-                 font=('Courier', 10),
-                 bg='#222222',
-                 fg='#ff5555',
-                 command=settings_window.destroy).pack(side=tk.RIGHT, padx=5)
+                text="Отмена",
+                font=('Courier', 10),
+                bg='#222222',
+                fg='#ff5555',
+                command=settings_window.destroy).pack(side=tk.RIGHT, padx=5)
+
     
     def _test_ollama(self, path):
         """Тест подключения к Ollama в отдельном потоке"""
@@ -2097,6 +2222,9 @@ class JarvisVisual:
             elif isinstance(widget, tk.Button):
                 text = widget.cget("text")
                 if "НАСТРОЙКИ" in text or "СПРАВКА" in text or "Очистить" in text:
+                    widget.config(bg='#222222', fg=self.colors['accent'])
+                elif "КОМАНДЫ" in text:
+                    # Особое оформление для кнопки КОМАНДЫ
                     widget.config(bg='#222222', fg=self.colors['accent'])
                 elif "ВЫХОД" in text:
                     widget.config(bg='#222222', fg='#ff5555')

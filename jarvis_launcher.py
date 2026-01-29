@@ -120,54 +120,55 @@ def check_settings():
     """Проверить и создать файл настроек если нужно"""
     settings_file = "jarvis_settings.json"
     
+    default_settings = {
+        "voice_pack": {
+            "current_voice": "original"
+        },
+        "recognition": {
+            "engine": "vosk",
+            "vosk_model": "vosk-model-small-ru-0.22",
+            "activation_phrase": "джарвис",
+            "listen_timeout": 5.0,
+            "phrase_time_limit": 4.0
+        },
+        "voice": {
+            "tts_enabled": True,
+            "tts_rate": 180,
+            "tts_volume": 0.9,
+            "prefer_cached_sounds": True
+        },
+        "interface": {
+            "color_scheme": "default",
+            "always_on_top": True,
+            "auto_start_voice": True,
+            "show_timestamp": True,
+            "log_max_lines": 500
+        },
+        "reaction": {
+            "reactor_speed": 1.0,
+            "auto_reactor": True,
+            "reactor_duration": 2.5
+        },
+        "llm": {
+            "enabled": False,
+            "model": "deepseek-r1:8b",
+            "ollama_path": r"C:\Users\123\AppData\Local\Programs\Ollama\ollama.exe",
+            "system_prompt": "Ты — Джарвис, голосовой помощник на русском языке. Отвечай только по-русски. Если ты не знаете ответа, скажите мне честно. Твои ответы должны быть короткими — максимум 2–3 предложения."
+        },
+        "hotkeys": {
+            "global_hotkey": "ctrl+alt+j",
+            "activate_hotkey": "ctrl+shift+j",
+            "show_desktop_hotkey": "ctrl+alt+d"
+        },
+        "paths": {
+            "sounds_dir": "jarvis_sounds",
+            "vosk_models_dir": "voice_models",
+            "screenshots_dir": "screenshots"
+        }
+    }
+    
     if not os.path.exists(settings_file):
         print("Файл настроек не найден, создаю стандартные настройки...")
-        
-        default_settings = {
-            "llm": {
-        "enabled": False,
-        "model": "deepseek-r1:8b",
-        "ollama_path": r"C:\Users\123\AppData\Local\Programs\Ollama\ollama.exe".format(os.getenv('USERNAME')),
-        "system_prompt": "Ты — Джарвис, голосовой помощник на русском языке. Отвечай только по-русски. Если ты не знаете ответа, скажите мне честно. Твои ответы должны быть короткими — максимум 2–3 предложения."
-    },
-
-            "recognition": {
-                "engine": "vosk",
-                "vosk_model": "vosk-model-small-ru-0.22",
-                "activation_phrase": "джарвис",
-                "listen_timeout": 5.0,
-                "phrase_time_limit": 4.0
-            },
-            "voice": {
-                "tts_enabled": True,
-                "tts_rate": 180,
-                "tts_volume": 0.9,
-                "prefer_cached_sounds": True
-            },
-            "interface": {
-                "color_scheme": "default",
-                "always_on_top": True,
-                "auto_start_voice": True,
-                "show_timestamp": True,
-                "log_max_lines": 500
-            },
-            "reaction": {
-                "reactor_speed": 1.0,
-                "auto_reactor": True,
-                "reactor_duration": 2.5
-            },
-            "hotkeys": {
-                "global_hotkey": "ctrl+alt+j",
-                "activate_hotkey": "ctrl+shift+j",
-                "show_desktop_hotkey": "ctrl+alt+d"
-            },
-            "paths": {
-                "sounds_dir": "jarvis_sounds",
-                "vosk_models_dir": "voice_models",
-                "screenshots_dir": "screenshots"
-            }
-        }
-        
         try:
             with open(settings_file, 'w', encoding='utf-8') as f:
                 json.dump(default_settings, f, indent=4, ensure_ascii=False)
@@ -176,6 +177,38 @@ def check_settings():
             print(f"Ошибка создания файла настроек: {e}")
     else:
         print(f"Файл настроек найден: {settings_file}")
+        # Проверяем и обновляем структуру настроек
+        try:
+            with open(settings_file, 'r', encoding='utf-8') as f:
+                existing_settings = json.load(f)
+            
+            # Проверяем наличие voice_pack
+            if "voice_pack" not in existing_settings:
+                existing_settings["voice_pack"] = {"current_voice": "original"}
+                print("Добавлен раздел voice_pack в настройки")
+            
+            # Проверяем наличие всех необходимых полей
+            updated = False
+            for section, values in default_settings.items():
+                if section not in existing_settings:
+                    existing_settings[section] = values
+                    updated = True
+                    print(f"Добавлен раздел {section} в настройки")
+                elif isinstance(values, dict):
+                    for key, value in values.items():
+                        if key not in existing_settings[section]:
+                            existing_settings[section][key] = value
+                            updated = True
+                            print(f"Добавлен параметр {section}.{key} в настройки")
+            
+            # Сохраняем обновленные настройки
+            if updated:
+                with open(settings_file, 'w', encoding='utf-8') as f:
+                    json.dump(existing_settings, f, indent=4, ensure_ascii=False)
+                print("Настройки обновлены")
+                
+        except Exception as e:
+            print(f"Ошибка проверки настроек: {e}")
 
 def check_requirements():
     """Проверить требования"""
