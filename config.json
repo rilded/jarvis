@@ -8,16 +8,5 @@
   "custom_voices": {},
   "urgent_commands_enabled": true,
   "always_listen_mode": false,
-  "user_commands": [
-    {
-      "trigger": "музыка",
-      "action": "открытие файлов",
-      "parameter": "C:\\Users\\123\\AppData\\Local\\Programs\\YandexMusic\\Яндекс Музыка.exe"
-    },
-    {
-      "trigger": "новости",
-      "action": "открытие ссылки",
-      "parameter": "https://news.yandex.ru"
-    }
-  ]
+  "user_commands": []
 }

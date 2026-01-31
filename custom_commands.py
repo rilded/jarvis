@@ -49,14 +49,56 @@ class CustomCommandsManager:
             json.dump(self.sequences, f, indent=2, ensure_ascii=False)
     
     def create_command(self, name, action_type, params):
-        """Создать новую команду"""
-        self.commands[name.lower()] = {
+        """Создать новую команду с проверкой конфликта со стандартными командами"""
+        name = name.lower().strip()
+        if not name:
+            return False, "Имя команды не может быть пустым"
+        
+        # Проверяем конфликт с стандартными командами
+        conflict_cmd = self.check_conflict(name)
+        if conflict_cmd:
+            return False, f"Конфликт с стандартной командой: '{conflict_cmd}'"
+        
+        # Проверяем конфликт с уже существующими кастомными командами
+        if name in self.commands:
+            return False, f"Команда с именем '{name}' уже существует"
+        
+        # Создаем команду
+        self.commands[name] = {
             'type': action_type,
             'params': params,
             'created': time.strftime("%Y-%m-%d %H:%M:%S")
         }
         self.save_commands()
-        return True
+        return True, f"Команда '{name}' создана успешно"
+    
+    # Добавим метод для проверки конфликта
+    def check_conflict(self, name):
+        """Проверить, конфликтует ли имя команды со стандартными командами"""
+        name = name.lower().strip()
+        
+        try:
+            # Попробуем импортировать стандартные команды
+            from voice_input import STANDARD_COMMANDS
+            conflict_std_cmd = None
+            for std_cmd in STANDARD_COMMANDS:
+                # Проверяем точное совпадение или вхождение
+                if std_cmd == name or name == std_cmd:
+                    conflict_std_cmd = std_cmd
+                    break
+                # Проверяем, является ли одна команда частью другой
+                elif std_cmd in name or name in std_cmd:
+                    conflict_std_cmd = std_cmd
+                    break
+            
+            if conflict_std_cmd:
+                # Возвращаем название конфликтующей стандартной команды
+                return conflict_std_cmd
+            return None
+        except Exception as e:
+            print(f"Предупреждение: не удалось проверить конфликты: {e}")
+            # Если стандартные команды недоступны, пропускаем проверку
+            return None
     
     def create_sequence(self, name, actions):
         """Создать последовательность действий"""

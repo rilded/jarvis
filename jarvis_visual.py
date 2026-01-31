@@ -17,6 +17,7 @@ from custom_commands import CustomCommandsManager
 from commands_interface import CommandEntry
 from commands_interface import UniversalCommandEntry
 from jarvis_sound_manager import JarvisSoundManager
+from advanced_customization import AdvancedCustomization
 
 # Добавляем текущую папку в путь
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -380,9 +381,9 @@ class JarvisVisual:
         self.settings_manager = SettingsManager()
         self.settings = self.settings_manager.settings
         from jarvis_sound_manager import JarvisSoundManager
-        # ИСПРАВЛЕНО: передаем текущий голос из настроек
         self.sound_manager = JarvisSoundManager(voice_pack=self.settings['voice_pack']['current_voice'])
         self.commands_manager = CustomCommandsManager()
+        self.customization = AdvancedCustomization(self.settings_manager, main_app=self)
         
         
         # Цветовые схемы
@@ -474,7 +475,7 @@ class JarvisVisual:
         
         # Создаем окно
         self.root = tk.Tk()
-        self.root.title("JARVIS 9.0")
+        self.root.title("JARVIS 9.2")
         
         self.setup_window()
         
@@ -503,7 +504,7 @@ class JarvisVisual:
         
         # Начальное сообщение
         self.root.after(1000, lambda: self.add_status_message(
-            f"JARVIS 9.0 - Голосовой режим {'АКТИВЕН' if self.settings['interface']['auto_start_voice'] else 'ВЫКЛЮЧЕН'}",
+            f"JARVIS 9.2 - Голосовой режим {'АКТИВЕН' if self.settings['interface']['auto_start_voice'] else 'ВЫКЛЮЧЕН'}",
             self.colors['text']
         ))
         
@@ -853,6 +854,12 @@ class JarvisVisual:
 
     def open_commands_manager(self):
         """Открыть менеджер команд"""
+        self.commands_interface = CommandsInterface(
+            self, 
+            self.colors, 
+            self.commands_manager,
+            main_app=self  # Передаем ссылку на само приложение
+        )
         self.commands_interface.open_commands_window()
     
     def create_dialog_field(self, parent):
@@ -1290,7 +1297,7 @@ class JarvisVisual:
         logo_frame.pack(side=tk.LEFT)
         
         tk.Label(logo_frame,
-                text="J.A.R.V.I.S. 9.0",
+                text="J.A.R.V.I.S. 9.2",
                 font=('Arial', 24, 'bold'),
                 fg=self.colors['accent'],
                 bg=self.colors['bg']).pack(side=tk.LEFT)
@@ -2570,7 +2577,7 @@ class JarvisVisual:
         """Запустить визуализацию"""
         # Начальные сообщения
         self.add_status_message("=" * 40, self.colors['text'])
-        self.add_status_message("JARVIS 9.0 - Визуальный интерфейс", self.colors['text'])
+        self.add_status_message("JARVIS 9.2 - Визуальный интерфейс", self.colors['text'])
         self.add_status_message("Аркадный реактор: Инициализация...", self.colors['text'])
         self.add_status_message("Все системы: В норме", self.colors['text'])
         
@@ -2614,7 +2621,7 @@ class JarvisVisual:
 def main():
     """Запустить финальную версию"""
     print("=" * 60)
-    print(" " * 20 + "JARVIS 9.0")
+    print(" " * 20 + "JARVIS 9.2")
     print("=" * 60)
     print()
     print("Запуск визуального интерфейса...")

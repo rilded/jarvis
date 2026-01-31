@@ -4,12 +4,13 @@ import os
 import tkinter as tk
 from tkinter import ttk, colorchooser, font
 import sys
-import messagebox
+import tkinter.messagebox as messagebox
 
 class AdvancedCustomization:
-    def __init__(self, settings_manager):
+    def __init__(self, settings_manager, main_app=None):
         self.settings_manager = settings_manager
         self.settings = settings_manager.settings
+        self.main_app = main_app
         
     def open_customization_window(self, parent):
         """Открыть окно расширенной кастомизации"""
@@ -234,6 +235,12 @@ class AdvancedCustomization:
         prefix_entry.insert(0, self.get_setting('customization.commands.voice_prefix', 'запусти'))
         prefix_entry.pack(anchor=tk.W, padx=5, pady=2)
         
+        # Добавляем предупреждение о конфликтах
+        tk.Label(voice_frame, text="Внимание: кастомные команды с именами стандартных команд", 
+                fg='#ffaa00', bg='#111111', font=('Arial', 9)).pack(anchor=tk.W)
+        tk.Label(voice_frame, text="могут конфликтовать и перекрывать их функционал", 
+                fg='#ffaa00', bg='#111111', font=('Arial', 9)).pack(anchor=tk.W)
+        
         # Шаблоны команд
         templates_frame = tk.LabelFrame(frame, text="Шаблоны команд", bg='#111111', fg='white')
         templates_frame.pack(fill=tk.X, padx=10, pady=10)
@@ -287,14 +294,12 @@ class AdvancedCustomization:
 
     def open_commands_manager(self):
         """Открыть менеджер команд"""
-        # Нужно импортировать и вызвать интерфейс команд
         try:
             from jarvis_visual import JarvisVisual
-            # Здесь нужно получить экземпляр главного приложения
-            if hasattr(self, 'main_app'):
+            if self.main_app:  # Теперь main_app гарантированно существует
                 self.main_app.open_commands_manager()
-        except:
-            messagebox.showinfo("Информация", "Менеджер команд доступен из главного окна")
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось открыть менеджер команд:\n{str(e)}")
 
     
     def create_hotkeys_tab(self, notebook):

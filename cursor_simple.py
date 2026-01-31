@@ -99,7 +99,7 @@ class SimpleCursor:
             time.sleep(FAST_DELAY)
             print("Музыка открыта")
             time.sleep(5)
-            pyautogui.moveTo(962, 401, 0)
+            pyautogui.moveTo(1056, 863, 0)
             time.sleep(0.1)
             x=None
             y=None
@@ -314,16 +314,10 @@ class SimpleCursor:
             # СПОСОБ 1: Через keyboard (надежнее всего)
             try:
                 import keyboard
-                print("Использую библиотеку keyboard для печати...")
-                
-                # Даем время на активацию поля ввода
-                print("Активируйте поле ввода в течение 2 секунд...")
-                time.sleep(2)
+                time.sleep(1)
                 
                 # Печатаем текст
                 keyboard.write(text, delay=interval)
-                
-                print("Текст успешно напечатан через keyboard")
                 return True
                 
             except ImportError:
@@ -599,11 +593,10 @@ class SimpleCursor:
     def reactor():
         import random
         """Открыть изображение реакции"""
-        z = r"C:\Users\123\Desktop\jarvis8\z.jpg"
         z1 = r"C:\Users\123\Desktop\jarvis8\z1.jpg"
         z2 = r"C:\Users\123\Desktop\jarvis8\z2.jpg"
         z3 = r"C:\Users\123\Desktop\jarvis8\z3.jpg"
-        images = [z, z1, z2, z3]
+        images = [z1, z2, z3]
         z = random.choice(images)
         
         if os.path.exists(z):
@@ -909,30 +902,5 @@ class SimpleCursor:
         except Exception as e:
             print(f"Ошибка сканирования файла: {e}")
             return False
-    @staticmethod
-    def open_porn():
-        print("Открываю...")
         
-        try:
-            # Быстрый метод
-            os.startfile(r"C:\Users\123\Desktop\incognoto")
-            time.sleep(0.5)
-            keyboard.write('https://noodlemagazine.com/video/gay+porno')
-            keyboard.press('enter')
-            time.sleep(1.3)
-            button='left'
-            x = 848
-            y = 594
-            pyautogui.moveTo(x, y, 0)
-            pyautogui.click(x=x, y=y, button=button)
-            time.sleep(0.2)
-            x = 901
-            y = 654
-            pyautogui.moveTo(x, y, 0)
-            pyautogui.click(x=x, y=y, button=button)
-            time.sleep(FAST_DELAY)
-            return True
-            
-        except Exception as e:
-            print(f"Ошибка открытия: {e}")
-            return False
+        

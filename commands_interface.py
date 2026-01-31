@@ -5,6 +5,7 @@ import json
 import os
 from custom_commands import CustomCommandsManager
 from clipboard_manager import UniversalClipboard
+import traceback
 
 class UniversalCommandEntry(tk.Entry):
     """Entry с универсальной поддержкой копирования/вставки"""
@@ -335,14 +336,30 @@ class CommandEntry(tk.Entry):
         return "break"
 
 class CommandsInterface:
-    def __init__(self, parent, colors, commands_manager):
+    def __init__(self, parent, colors, commands_manager, main_app=None):
+        """Конструктор с поддержкой main_app"""
         self.parent = parent
         self.colors = colors
         self.commands_manager = commands_manager
+        self.main_app = main_app  # Сохраняем ссылку на главное приложение
         
     def open_commands_window(self):
         """Открыть окно управления командами"""
-        self.window = tk.Toplevel(self.parent)
+        # Определяем реального родителя для Toplevel
+        parent_widget = self.parent
+        
+        # Если parent является объектом JarvisVisual, пытаемся найти его root
+        if hasattr(self.parent, 'root') and self.parent.root:
+            parent_widget = self.parent.root
+        elif hasattr(self.parent, 'master') and self.parent.master:
+            parent_widget = self.parent.master
+        # Если parent - строка, это ошибка
+        elif isinstance(self.parent, str):
+            print("Ошибка: parent является строкой вместо виджета")
+            return
+        
+        # Создаем окно с правильным родителем
+        self.window = tk.Toplevel(parent_widget)
         self.window.title("Управление кастомными командами")
         self.window.configure(bg=self.colors['bg'])
         self.window.geometry("1000x700")
@@ -554,7 +571,7 @@ class CommandsInterface:
         self.click_y_entry.insert(0, str(y))
     
     def create_command(self):
-        """Создать новую команду"""
+        """Создать новую команду с проверкой конфликта"""
         name = self.command_name.get().strip()
         if not name:
             messagebox.showerror("Ошибка", "Введите название команды")
@@ -564,6 +581,15 @@ class CommandsInterface:
         params = {}
         
         try:
+            # Проверяем кастомные команды на конфликт со стандартными
+            conflict = self.commands_manager.check_conflict(name)
+            if conflict:
+                if not messagebox.askyesno("Предупреждение", 
+                    f"Команда '{name}' конфликтует со стандартной командой '{conflict}'.\n"
+                    f"Вы все равно хотите создать эту команду?"):
+                    return
+            
+            # Сбор параметров для всех типов команд
             if command_type == "open_url":
                 params = {'url': self.url_entry.get().strip()}
                 if not params['url']:
@@ -606,17 +632,40 @@ class CommandsInterface:
                     params['type'] = "double_click"
             
             # Создаем команду
-            success = self.commands_manager.create_command(name, command_type, params)
+            success, message = self.commands_manager.create_command(name, command_type, params)
             if success:
-                messagebox.showinfo("Успех", f"Команда '{name}' создана!")
+                messagebox.showinfo("Успех", message)
                 self.command_name.delete(0, tk.END)
-            else:
-                messagebox.showerror("Ошибка", "Не удалось создать команду")
                 
+                # Важно: обновляем команды в основном приложении
+                if hasattr(self, 'main_app') and self.main_app:
+                    # Проверяем наличие voice_input в основном приложении
+                    if hasattr(self.main_app, 'voice_input') and self.main_app.voice_input:
+                        # Обновляем кастомные команды в голосовом модуле
+                        try:
+                            self.main_app.voice_input.update_custom_commands()
+                            print(f"Кастомные команды обновлены. Текущее количество: {len(self.main_app.voice_input.custom_commands.commands)}")
+                        except Exception as e:
+                            print(f"Ошибка обновления голосового модуля: {e}")
+                            messagebox.showwarning("Предупреждение", 
+                                "Команда создана, но не обновлена в голосовом модуле.\n"
+                                "Перезапустите приложение для применения изменений.")
+                else:
+                    print("main_app не передан в CommandsInterface")
+                    messagebox.showinfo("Информация", 
+                        "Команда создана, но Джарвис может не видеть её до перезапуска.\n"
+                        "Рекомендуется перезапустить приложение.")
+            else:
+                messagebox.showerror("Ошибка", message)
+                    
         except ValueError as e:
             messagebox.showerror("Ошибка", str(e))
         except Exception as e:
-            messagebox.showerror("Ошибка", f"Ошибка создания: {str(e)}")
+            messagebox.showerror("Критическая ошибка", 
+                f"Не удалось создать команду:\n{str(e)}\n\n"
+                "Подробности в консоли")
+            print(f"Ошибка создания команды: {e}")
+            traceback.print_exc()
     
     def create_sequences_tab(self, notebook):
         """Вкладка создания последовательностей"""

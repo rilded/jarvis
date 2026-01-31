@@ -15,6 +15,61 @@ from jarvis_sound_manager import JarvisSoundManager
 from custom_commands import CustomCommandsManager
 from cursor_simple import SimpleCursor
 
+STANDARD_COMMANDS = [
+    "помощь", "выход", "таймер", "новости", "музыка", "погода", "время", "дата", "шутка",
+    "калькулятор", "блокнот", "командная строка", "скриншот", "громче", "тише", "звук",
+    "выключи компьютер", "перезагрузи компьютер", "спящий режим", "заблокируй компьютер",
+    "яндекс", "хром", "ютуб", "проводник", "рабочий стол", "закрой окно", "закрой все окна",
+    "deepseek", "lms", "реакция", "перевод", "напечатай", "открой", "джарвис", "список",
+    "покажи", "запусти", "включи", "выключи", "проверь", "сделай", "посмотри", "проверка на вирусы",
+    "вирустатал", "открой вирустатал", "открой проверку на вирусы", "сканировать на вирусы",
+    "антивирус", "проверь на вирусы", "просканировать на вирусы", "проверить на вирусы",
+    "открой антивирус", "запусти проверку на вирусы", "вирус тотал", "вирустаталь", "вирустата",
+    "проверь файл", "просканируй файл", "проверить файл", "сканировать файл", "просканировать файл",
+    "загрузи файл на проверку", "отсканируй файл", "проверка файла", "анализ файла", "проверь ссылку",
+    "проверить ссылку", "просканируй ссылку", "просканировать ссылку", "сканировать ссылку",
+    "анализ ссылки", "проверь сайт", "проверить сайт", "просканируй сайт", "ссылка на проверку",
+    "урл на проверку", "закрой окно", "закрыть окно", "закрыть это окно", "выключи окно",
+    "отключи окно", "удали окно", "убери окно", "сними окно", "окно закрой", "окно закрыть",
+    "закрывай окно", "сверни окно", "свернуть окно", "свернуть это окно", "сворачивай окно",
+    "минимизируй окно", "минимизировать окно", "спрячь окно", "скрой окно", "сверни это окно",
+    "окно сверни", "окно свернуть", "закрой все окна", "закрыть все окна", "выключение",
+    "выключи компьютер", "отключи компьютер", "отключение", "выключи пк", "выключи систему",
+    "заверши работу компьютера", "заверши работу пк", "заверши работу", "завершение работы",
+    "отключи пк", "отключи систему", "отключение компьютера", "отключение пк", "отключение системы",
+    "выключение компьютера", "выключение пк", "выключение системы", "выруби компьютер",
+    "выруби пк", "выруби", "завершение работы компьютера", "завершение работы пк",
+    "перезагрузи компьютер", "перезагрузка", "рестарт", "перезапусти компьютер",
+    "перезагрузи пк", "перезапусти пк", "перезагрузи систему", "перезапусти систему",
+    "рестарт компьютера", "рестарт пк", "рестарт системы", "перезагрузка компьютера",
+    "перезагрузка пк", "перезагрузка системы", "ребут", "перезапуск", "перезапуск компьютера",
+    "перезапуск пк", "перезапуск системы", "перезагрузить", "перезагрузить компьютер",
+    "перезагрузить пк", "перезагрузить систему", "обнови компьютер", "обнови пк", "обнови систему",
+    "обновление системы", "спящий режим", "усыпи компьютер", "сон", "режим сна",
+    "спящий режим компьютера", "спящий режим пк", "сон компьютера", "сон пк", "режим сна компьютера",
+    "режим сна пк", "переведи в спящий режим", "переведи в режим сна", "усыпи пк", "усыпи систему",
+    "отправь в сон", "отправь компьютер в сон", "отправь пк в сон", "заблокируй компьютер",
+    "блокировка", "заблокируй", "заблокируй пк", "заблокируй систему", "заблокируй экран",
+    "блокировка компьютера", "блокировка пк", "блокировка системы", "блокировка экрана",
+    "заблокировать компьютер", "заблокировать пк", "заблокировать систему", "заблокировать экран",
+    "экран блокировки", "включи блокировку", "включи экран блокировки", "активируй блокировку",
+    "активируй экран блокировки", "поставь на замок", "поставь замок", "запри компьютер",
+    "запри пк", "запри систему", "запри экран", "краши комп", "краш", "кот красный", "крашни компьютер",
+    "красный компьютер", "ты дебил", "урони комп", "урони компьютер", "урони систему", "завали комп",
+    "завали компьютер", "сломай комп", "сломай компьютер", "поломай комп", "поломай компьютер",
+    "краш система", "крашни систему", "синий экран смерти", "открой я лмс", "открой яндэкс лмс",
+    "открой ядекс лмс", "я лмс", "яндэкс лмс", "ядекс лмс", "яндекс лицей", "открой яндекс лицей",
+    "запусти лмс", "запусти элмс", "запусти я лмс", "запусти яндэкс лмс", "запусти ядекс лмс",
+    "платформа обучения", "обучающая платформа", "открой диспетчер команд", "импорт команд из файла",
+    "экспорт команд в файл", "создай команду", "создать команду", "покажи команды", "команды",
+    "удали команду", "создай последовательность", "создать последовательность", "покажи последовательности",
+    "последовательности", "удали последовательность", "afk мод", "afk режим", "афк режим", "афк мод",
+    "stop afk", "стоп afk", "останови afk", "выйти из afk", "llm режим", "режим общения", "общение с ии",
+    "включи llm", "включи ии", "включи искусственный интеллект", "оллама", "ollama", "дипсик",
+    "deepseek", "глубокий поиск", "переключись в обычный режим", "выход из режима общения", "отключи llm",
+    "отключи ии", "выключи режим общения", "закрой ии", "llm запрос"
+]
+
 class VoiceInput:
     """Класс для голосового ввода с микрофоном"""
     
@@ -89,6 +144,23 @@ class VoiceInput:
         
         # Пытаемся загрузить библиотеки для голоса
         self._init_speech_recognition()
+
+    def update_custom_commands(self):
+        """Обновляет кастомные команды из файла"""
+        try:
+            # Пересоздаем менеджер команд для загрузки обновленных данных
+            from custom_commands import CustomCommandsManager
+            self.custom_commands = CustomCommandsManager()
+            print(f"Кастомные команды обновлены. Найдено: {len(self.custom_commands.commands)} команд")
+            return True
+        except Exception as e:
+            print(f"Ошибка обновления кастомных команд: {e}")
+            return False
+
+    def is_standard_command(self, command_name):
+        """Проверить, является ли команда стандартной"""
+        command_lower = command_name.lower().strip()
+        return any(std_cmd in command_lower or command_lower in std_cmd for std_cmd in STANDARD_COMMANDS)
 
     def set_voice_pack(self, voice_pack):
         """Установить голосовой пакет для голосового модуля"""
@@ -1722,7 +1794,8 @@ class VoiceInput:
         
     def process_voice_command(self, text, desktop, cursor):
         """Обработка голосовых команд с приоритетом LLM режима"""
-        # ЕСЛИ МЫ В РЕЖИМЕ LLM И ЕСТЬ АКТИВАЦИОННАЯ ФРАЗА - ОБРАБАТЫВАЕМ КАК LLM ЗАПРОС
+        
+        # Сначала проверяем LLM режим
         print(f"[DEBUG] process_voice_command вызван с: {text}")
         print(f"[DEBUG] is_llm_mode: {self.is_llm_mode}")
         if self.is_llm_mode and self.activation_phrase in text.lower():
@@ -1736,25 +1809,81 @@ class VoiceInput:
                 # Если только активационная фраза - подтверждаем готовность
                 self._speak_direct("Слушаю ваш вопрос")
                 return "listening"
-    
-        # Продолжаем обычную обработку команд
-        if self.process_custom_command(text, desktop, cursor):
+
+        # Проверяем кастомные команды ПЕРЕД стандартными
+        text_lower = text.lower().strip()
+        
+        # 1. Сначала ищем точное совпадение с кастомными командами
+        exact_custom_match = None
+        for command_name in self.custom_commands.commands.keys():
+            if text_lower == command_name:
+                exact_custom_match = command_name
+                break
+        
+        if exact_custom_match:
+            print(f"[CUSTOM] Точное совпадение: {exact_custom_match}")
+            success, message = self.custom_commands.execute_command(exact_custom_match)
+            if success:
+                self.speak(f"Выполняю кастомную команду: {message}")
+            else:
+                self.speak(f"Ошибка выполнения команды: {message}")
             return "custom_command_processed"
         
-        cmd_type, params = self.parse_command(text)
+        # 2. Если точного совпадения нет, ищем наиболее длинное частичное совпадение
+        longest_partial_match = None
+        max_length = 0
+        for command_name in self.custom_commands.commands.keys():
+            if command_name in text_lower and len(command_name) > max_length:
+                longest_partial_match = command_name
+                max_length = len(command_name)
         
-        # В режиме LLM пропускаем озвучку стандартных команд
-        if self.is_llm_mode:
-            # Только выполнение команды без озвучки
-            if cmd_type == "exit":
-                self.stop_llm_mode()
-                return "exit"
-            elif cmd_type == "stop_llm":
-                self.stop_llm_mode()
-                return "llm_stopped"
+        if longest_partial_match:
+            print(f"[CUSTOM] Частичное совпадение (наиболее длинное): {longest_partial_match}")
+            success, message = self.custom_commands.execute_command(longest_partial_match)
+            if success:
+                self.speak(f"Выполняю кастомную команду: {message}")
             else:
-                # Для других команд в режиме LLM просто возвращаем результат
-                return cmd_type
+                self.speak(f"Ошибка выполнения команды: {message}")
+            return "custom_command_processed"
+        
+        # 3. Проверяем выполнение кастомных последовательностей
+        longest_sequence_match = None
+        max_sequence_length = 0
+        for sequence_name in self.custom_commands.sequences.keys():
+            if sequence_name in text_lower and len(sequence_name) > max_sequence_length:
+                longest_sequence_match = sequence_name
+                max_sequence_length = len(sequence_name)
+        
+        if longest_sequence_match:
+            print(f"[CUSTOM] Найдена кастомная последовательность: {longest_sequence_match}")
+            success, message = self.custom_commands.execute_sequence(longest_sequence_match)
+            if success:
+                self.speak(f"Выполняю последовательность: {message}")
+            else:
+                self.speak(f"Ошибка выполнения последовательности: {message}")
+            return "custom_sequence_processed"
+
+        # Проверяем команды управления кастомными командами
+        if text_lower.startswith("создай команду ") or text_lower.startswith("создать команду "):
+            return ("create_command", [text[text.find("команду") + 8:].strip()])
+        
+        elif text_lower.startswith("создай последовательность ") or text_lower.startswith("создать последовательность "):
+            return ("create_sequence", [text[text.find("последовательность") + 18:].strip()])
+        
+        elif text_lower.startswith("покажи команды") or text_lower == "команды":
+            return ("list_commands", [])
+        
+        elif text_lower.startswith("покажи последовательности") or text_lower == "последовательности":
+            return ("list_sequences", [])
+        
+        elif text_lower.startswith("удали команду "):
+            return ("delete_command", [text[14:].strip()])
+        
+        elif text_lower.startswith("удали последовательность "):
+            return ("delete_sequence", [text[23:].strip()])
+
+        # Проверяем стандартные команды
+        cmd_type, params = self.parse_command(text)
         
         # Маппинг команд на доступные фразы
         response_map = {
@@ -1981,7 +2110,7 @@ class VoiceInput:
         else:
             print("Неизвестная команда")
         
-        return None  # Возвращаем None для обычных команд
+        return None
     
     def type_text(self, text, cursor):
         """Напечатать текст"""
@@ -2284,6 +2413,7 @@ class VoiceInput:
             time_speech = f"Сейчас {hours} часов {minutes} минут"
         
         print(f"Озвучиваю время: {time_speech}")
+        time.sleep(1)
         
         # ГАРАНТИРОВАННАЯ ОЗВУЧКА через основной метод
         self.speak_direct(time_speech)
@@ -2579,44 +2709,11 @@ class VoiceInput:
     
     def parse_command(self, text):
         """Расширенный парсинг команд с поддержкой кастомных команд"""
-    
-        # Сначала проверяем кастомные команды
-        text_lower = text.lower()
         
-        # Проверяем команды управления кастомными командами
-        if text_lower.startswith("создай команду ") or text_lower.startswith("создать команду "):
-            return ("create_command", [text[text.find("команду") + 8:].strip()])
-        
-        elif text_lower.startswith("создай последовательность ") or text_lower.startswith("создать последовательность "):
-            return ("create_sequence", [text[text.find("последовательность") + 18:].strip()])
-        
-        elif text_lower.startswith("покажи команды") or text_lower == "команды":
-            return ("list_commands", [])
-        
-        elif text_lower.startswith("покажи последовательности") or text_lower == "последовательности":
-            return ("list_sequences", [])
-        
-        elif text_lower.startswith("удали команду "):
-            return ("delete_command", [text[14:].strip()])
-        
-        elif text_lower.startswith("удали последовательность "):
-            return ("delete_sequence", [text[23:].strip()])
-        
-        # Проверяем выполнение кастомных команд
-        for command_name in self.custom_commands.commands.keys():
-            if command_name in text_lower:
-                return ("custom_command", [command_name])
-        
-        # Проверяем выполнение последовательностей
-        for sequence_name in self.custom_commands.sequences.keys():
-            if sequence_name in text_lower:
-                return ("custom_sequence", [sequence_name])
-
-        """Преобразовать текст в команду - ОБНОВЛЕНО ДЛЯ LLM"""
         if not text:
             return ("пусто", [])
         
-        text = text.lower().strip()
+        text_lower = text.lower().strip()
 
         # Команды для LLM режима - УЛУЧШЕННОЕ РАСПОЗНАВАНИЕ
         llm_keywords = [
@@ -2624,15 +2721,10 @@ class VoiceInput:
             "общение с ии", 
             "включи llm",
             "включи ии",
-            "включи искусственный интеллект",
             "оллама",
-            "ollama",
-            "дипсик",
-            "deepseek",
-            "глубокий поиск"
         ]
         
-        if any(keyword in text for keyword in llm_keywords):
+        if any(keyword in text_lower for keyword in llm_keywords):
             return ("llm_mode", [])
         
         stop_llm_keywords = [
@@ -2644,13 +2736,13 @@ class VoiceInput:
             "закрой ии"
         ]
         
-        if any(keyword in text for keyword in stop_llm_keywords):
+        if any(keyword in text_lower for keyword in stop_llm_keywords):
             return ("stop_llm", [])
         
         # Если мы в режиме LLM и слышим активационную фразу, обрабатываем как запрос
-        if self.is_llm_mode and self.activation_phrase in text:
+        if self.is_llm_mode and self.activation_phrase in text_lower:
             # Извлекаем запрос (убираем активационную фразу и лишние слова)
-            query = text.strip()
+            query = text_lower.strip()
             
             # Убираем лишние слова
             stop_words = ["пожалуйста", "скажи", "расскажи", "ответь", "объясни"]
@@ -3455,6 +3547,7 @@ class VoiceInput:
             "расскажи о себе": ("help", []),
             
             # ================== РЕАКЦИЯ ==================
+            "что за хуйня": ("reaction", []),
             "реакция": ("reaction", []),
             "покажи реакцию": ("reaction", []),
             "открой реакцию": ("reaction", []),
