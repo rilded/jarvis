@@ -593,9 +593,9 @@ class SimpleCursor:
     def reactor():
         import random
         """Открыть изображение реакции"""
-        z1 = r"C:\Users\123\Desktop\jarvis8\z1.jpg"
-        z2 = r"C:\Users\123\Desktop\jarvis8\z2.jpg"
-        z3 = r"C:\Users\123\Desktop\jarvis8\z3.jpg"
+        z1 = r"C:\Users\123\Desktop\jarvis9\z1.jpg"
+        z2 = r"C:\Users\123\Desktop\jarvis9\z2.jpg"
+        z3 = r"C:\Users\123\Desktop\jarvis9\z3.jpg"
         images = [z1, z2, z3]
         z = random.choice(images)
         
@@ -811,10 +811,8 @@ class SimpleCursor:
         print("Сворачиваю окно...")
         
         try:
-            # Метод 1: Alt+Пробел, N
-            pyautogui.hotkey('alt', 'space')
+            pyautogui.hotkey('ctrl', 'win', 'down')
             time.sleep(0.1)
-            pyautogui.press('n')
             print("Окно свернуто)")
             time.sleep(FAST_DELAY)
             return True
@@ -830,6 +828,37 @@ class SimpleCursor:
             except Exception as e2:
                 print(f"Альтернативный метод не сработал: {e2}")
                 return False
+            
+    @staticmethod
+    def maximize_window():
+        """Развернуть окно во весь экран"""
+        print("Разворачиваю окно во весь экран...")
+        
+        try:
+            pyautogui.hotkey('win', 'up')
+            time.sleep(0.1)
+            print("Окно развернуто во весь экран")
+            time.sleep(FAST_DELAY)
+            return True
+        except Exception as e:
+            print(f"Ошибка разворачивания окна: {e}")
+            return False
+        
+    @staticmethod
+    def go_back():
+        """Перейти назад (Alt + Left)"""
+        print("Перехожу назад...")
+        
+        try:
+            pyautogui.hotkey('alt', 'left')
+            time.sleep(0.1)
+            print("Перешел назад")
+            time.sleep(FAST_DELAY)
+            return True
+        except Exception as e:
+            print(f"Ошибка перехода назад: {e}")
+            return False
+            
     @staticmethod
     def check_virustotal(url=None):
         """Открыть VirusTotal для проверки файлов или URL"""

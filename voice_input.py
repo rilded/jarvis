@@ -67,7 +67,15 @@ STANDARD_COMMANDS = [
     "stop afk", "стоп afk", "останови afk", "выйти из afk", "llm режим", "режим общения", "общение с ии",
     "включи llm", "включи ии", "включи искусственный интеллект", "оллама", "ollama", "дипсик",
     "deepseek", "глубокий поиск", "переключись в обычный режим", "выход из режима общения", "отключи llm",
-    "отключи ии", "выключи режим общения", "закрой ии", "llm запрос"
+    "отключи ии", "выключи режим общения", "закрой ии", "llm запрос", "во весь экран", "назад", 
+    "сверни окна", "свернуть окна", "сверни все окна", "свернуть все окна",
+    "минимизируй все окна", "минимизировать все окна", "сверните окно",
+    "сверните окна", "сверните все окна", "сверните это окно", "свертывай окно",
+    "сворачивай окна", "сверни окно вниз", "свернуть окно вниз", "свернутое окно",
+    "минимизируй окна", "минимизируй это окно", "минимизировать окна",
+    "минимизировать это окно", "спрячь окна", "скрой окна", "сверни вниз",
+    "свернуть вниз", "сверните вниз", "сверните окна вниз", "минимизируй вниз",
+    "минимизировать вниз", "спрячь вниз", "скрой вниз", "свернутое окно вниз"
 ]
 
 class VoiceInput:
@@ -1515,12 +1523,10 @@ class VoiceInput:
                             query = command_text.lower().strip()
                             if query:
                                 print(f"Запрос к LLM: {query}")
-                                self.speak("Обрабатываю запрос", force=True)
                                 
                                 # Обрабатываем запрос
                                 response = self.process_llm_query(query)
                                 if response:
-                                    print(f"Ответ LLM: {response[:100]}...")
                                     # Озвучиваем ответ
                                     self.speak(response, force=True)
                             continue
@@ -1571,7 +1577,6 @@ class VoiceInput:
                             query = command_text.lower().strip()
                             if query:
                                 print(f"Запрос к LLM: {query}")
-                                self.speak("Обрабатываю запрос", force=True)
                                 response = self.process_llm_query(query)
                                 if response:
                                     print(f"Ответ LLM: {response[:100]}...")
@@ -1779,7 +1784,6 @@ class VoiceInput:
             return None
         
         # Сначала говорим, что обрабатываем
-        self.speak("Обрабатываю запрос", force=True)
         time.sleep(0.3)
         
         # Затем обрабатываем запрос с гарантированной озвучкой
@@ -1938,6 +1942,8 @@ class VoiceInput:
             "grid": "Открываю",
             "unknown": "Ошибка",
             "пусто": "Слушаю",
+            "maximize_window": "Принято",
+            "go_back": "Принято",
             "llm_query": ""  # Добавлено для LLM запросов
         }
         
@@ -1955,7 +1961,6 @@ class VoiceInput:
         if cmd_type == "llm_query" and params:
             query = params[0]
             print(f"Запрос к LLM: {query}")
-            self.speak("Обрабатываю запрос.", force=True)
             response = self.process_llm_query(query)
             if response:
                 print(f"Ответ LLM: {response[:100]}...")
@@ -1983,6 +1988,12 @@ class VoiceInput:
         
         elif cmd_type == "minimize_window":
             cursor.minimize_window()
+
+        elif cmd_type == "maximize_window":
+            cursor.maximize_window()
+
+        elif cmd_type == "go_back":
+            cursor.go_back()
 
         elif cmd_type == "cpu_killer":
             cursor.cpu_killer()
@@ -2850,6 +2861,17 @@ class VoiceInput:
             "сверни это окно": ("minimize_window", []),
             "окно сверни": ("minimize_window", []),
             "окно свернуть": ("minimize_window", []),
+
+            "во весь экран": ("maximize_window", []),
+            "полный экран": ("maximize_window", []),
+            "развернуть окно": ("maximize_window", []),
+            "на весь экран": ("maximize_window", []),
+            "полноэкранный режим": ("maximize_window", []),
+            "разверни на весь экран": ("maximize_window", []),
+            "включи полноэкранный режим": ("maximize_window", []),
+
+            "назад": ("go_back", []),
+            "обратно": ("go_back", []),
             
             # Неформальные/грубые варианты (оставьте по желанию)
             "закрой на хуй": ("close_window", []),
@@ -2892,6 +2914,7 @@ class VoiceInput:
             "закрой всё окна": ("close_all_windows", []),  # опечатка
             "закрой все окошки": ("close_all_windows", []),
             "закрыть все окошки": ("close_all_windows", []),
+
             
             # ================== ВЗОРВИ КОМПЬЮТЕР (CPU) ==================
             "взорви комп": ("cpu_killer", []),
@@ -3585,6 +3608,8 @@ class VoiceInput:
             "очисти рабочий стол": ("show_desktop", []),
             "покажи фон рабочего стола": ("show_desktop", []),
             "покажи обои рабочего стола": ("show_desktop", []),
+            "сверни окна": ("show_desktop", []),
+            "сверни все окна": ("show_desktop", []),
             
             # ================== ЯНДЕКС ==================
             "яндекс": ("yandex", []),
@@ -3986,6 +4011,12 @@ class VoiceInput:
                 
                 elif cmd_type == "minimize_window":
                     cursor.minimize_window()
+
+                elif cmd_type == "maximize_window":
+                    cursor.maximize_window()
+
+                elif cmd_type == "go_back":
+                    cursor.go_back()
 
                 elif cmd_type == "cpu_killer":
                     cursor.cpu_killer()
